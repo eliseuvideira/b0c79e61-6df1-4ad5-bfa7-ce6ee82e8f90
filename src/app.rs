@@ -11,6 +11,7 @@ use axum_tracing_opentelemetry::{
     middleware::{OtelAxumLayer, OtelInResponseLayer},
     tracing_opentelemetry_instrumentation_sdk::find_current_trace_id,
 };
+use metrics_exporter_prometheus::PrometheusHandle;
 use tokio::net::TcpListener;
 use tower_http::trace::TraceLayer;
 use tracing::{debug_span, Instrument};
@@ -23,7 +24,7 @@ pub struct Application {
 }
 
 impl Application {
-    pub async fn build(configuration: Settings) -> Result<Self> {
+    pub async fn build(configuration: Settings, metrics_handle: PrometheusHandle) -> Result<Self> {
         let address = format!(
             "{}:{}",
             configuration.application.host, configuration.application.port
@@ -41,6 +42,10 @@ impl Application {
             .layer(from_fn(attach_trace_id))
             .layer(OtelInResponseLayer)
             .layer(OtelAxumLayer::default())
+            .route(
+                "/metrics",
+                get(move || std::future::ready(metrics_handle.render())),
+            )
             .route("/health", get(health_check))
             .fallback(not_found);
 
