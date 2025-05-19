@@ -1,12 +1,19 @@
 use anyhow::{Context, Result};
 use axum::{
+    extract::Request,
     http::StatusCode,
+    middleware::{from_fn, Next},
+    response::Response,
     routing::{get, Router},
     serve::Serve,
 };
-use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
+use axum_tracing_opentelemetry::{
+    middleware::{OtelAxumLayer, OtelInResponseLayer},
+    tracing_opentelemetry_instrumentation_sdk::find_current_trace_id,
+};
 use tokio::net::TcpListener;
 use tower_http::trace::TraceLayer;
+use tracing::{debug_span, Instrument};
 
 use crate::{config::Settings, error::Error};
 
@@ -31,6 +38,7 @@ impl Application {
 
         let router = Router::new()
             .layer(TraceLayer::new_for_http())
+            .layer(from_fn(attach_trace_id))
             .layer(OtelInResponseLayer)
             .layer(OtelAxumLayer::default())
             .route("/health", get(health_check))
@@ -58,4 +66,18 @@ async fn health_check() -> StatusCode {
 
 async fn not_found() -> Error {
     Error::NotFound
+}
+
+async fn attach_trace_id(req: Request, next: Next) -> Response {
+    let trace_id = find_current_trace_id();
+
+    let response = next
+        .run(req)
+        .instrument(debug_span!(
+            "trace_id",
+            trace_id = ?trace_id,
+        ))
+        .await;
+
+    response
 }
