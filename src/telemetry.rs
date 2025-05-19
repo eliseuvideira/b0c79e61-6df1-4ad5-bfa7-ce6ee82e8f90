@@ -35,7 +35,7 @@ impl Drop for TracingGuard {
     fn drop(&mut self) {
         let _ = self.tracer_provider.force_flush();
         let _ = self.tracer_provider.shutdown();
-        let _ = self.loki_handle.abort();
+        self.loki_handle.abort();
     }
 }
 

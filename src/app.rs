@@ -29,7 +29,7 @@ impl Application {
             .port();
 
         let router = Router::new()
-            .layer(OtelInResponseLayer::default())
+            .layer(OtelInResponseLayer)
             .layer(OtelAxumLayer::default())
             .route("/health", get(health_check))
             .fallback(not_found);
