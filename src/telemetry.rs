@@ -66,13 +66,15 @@ pub fn init_subscribers() -> Result<TracingGuard> {
 }
 
 fn build_env_filter_layer() -> Result<EnvFilter> {
+    let mut filter = std::env::var("RUST_LOG")
+        .or_else(|_| std::env::var("OTEL_LOG_LEVEL"))
+        .unwrap_or_else(|_| LevelFilter::INFO.to_string());
+
+    filter.push_str(",otel::tracing=trace");
+
     Ok(EnvFilter::builder()
         .with_default_directive(LevelFilter::INFO.into())
-        .parse_lossy(
-            std::env::var("RUST_LOG")
-                .or_else(|_| std::env::var("OTEL_LOG_LEVEL"))
-                .unwrap_or_else(|_| LevelFilter::INFO.to_string()),
-        ))
+        .parse_lossy(filter))
 }
 
 fn build_logger_text_layer<S>() -> Box<dyn Layer<S> + Send + Sync + 'static>
@@ -117,12 +119,12 @@ where
 {
     let otlp_exporter: opentelemetry_otlp::SpanExporter =
         opentelemetry_otlp::SpanExporter::builder()
-            .with_http()
+            .with_tonic()
             .with_endpoint(
                 std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
-                    .unwrap_or_else(|_| "http://127.0.0.1:4318/v1/traces".to_string()),
+                    .unwrap_or_else(|_| "http://127.0.0.1:4317".to_string()),
             )
-            .with_protocol(Protocol::HttpBinary)
+            .with_protocol(Protocol::Grpc)
             .build()
             .expect("Error");
     let batch_exporter =
