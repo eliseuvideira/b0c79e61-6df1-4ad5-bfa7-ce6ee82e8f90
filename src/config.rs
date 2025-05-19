@@ -8,6 +8,8 @@ pub struct Settings {
 
 #[derive(Deserialize)]
 pub struct ApplicationSettings {
+    pub name: String,
+    pub version: String,
     pub host: String,
     pub port: u16,
 }
@@ -35,6 +37,8 @@ impl Settings {
                     .prefix_separator("_")
                     .separator("__"),
             )
+            .set_override("application.name", env!("CARGO_PKG_NAME"))?
+            .set_override("application.version", env!("CARGO_PKG_VERSION"))?
             .build()
             .context("Failed to build configuration")?;
 

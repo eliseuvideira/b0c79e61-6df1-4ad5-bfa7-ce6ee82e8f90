@@ -97,8 +97,16 @@ where
 
 fn build_loki_layer() -> Result<(tracing_loki::Layer, BackgroundTask)> {
     let (loki_layer, background_task) = tracing_loki::builder()
-        .label("service", "integrations-api")?
-        .build_url(Url::parse("http://127.0.0.1:3100").unwrap())?;
+        .label("service_name", env!("CARGO_PKG_NAME"))?
+        .label("version", env!("CARGO_PKG_VERSION"))?
+        .label(
+            "environment",
+            std::env::var("APP_ENVIRONMENT").unwrap_or_else(|_| "local".to_string()),
+        )?
+        .build_url(Url::parse(
+            &std::env::var("LOGGING_LOKI_URL")
+                .unwrap_or_else(|_| "http://127.0.0.1:3100".to_string()),
+        )?)?;
 
     Ok((loki_layer, background_task))
 }
@@ -110,7 +118,10 @@ where
     let otlp_exporter: opentelemetry_otlp::SpanExporter =
         opentelemetry_otlp::SpanExporter::builder()
             .with_http()
-            .with_endpoint("http://localhost:4318/v1/traces")
+            .with_endpoint(
+                std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
+                    .unwrap_or_else(|_| "http://127.0.0.1:4318/v1/traces".to_string()),
+            )
             .with_protocol(Protocol::HttpBinary)
             .build()
             .expect("Error");
