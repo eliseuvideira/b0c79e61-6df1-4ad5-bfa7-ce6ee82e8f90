@@ -1,9 +1,11 @@
 use anyhow::Result;
 use integrations_api::app::Application;
-use integrations_api::config::Settings;
+use integrations_api::{config::Settings, telemetry::init_subscribers};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let _guard = init_subscribers()?;
+
     dotenvy::dotenv().ok();
     let configuration = Settings::build()?;
     let application = Application::build(configuration).await?;
