@@ -4,9 +4,10 @@ use integrations_api::{config::Settings, telemetry::init_subscribers};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    dotenvy::dotenv().ok();
+
     let _guard = init_subscribers()?;
 
-    dotenvy::dotenv().ok();
     let configuration = Settings::build()?;
     let application = Application::build(configuration).await?;
 

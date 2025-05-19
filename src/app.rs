@@ -6,6 +6,7 @@ use axum::{
 };
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use tokio::net::TcpListener;
+use tower_http::trace::TraceLayer;
 
 use crate::{config::Settings, error::Error};
 
@@ -29,6 +30,7 @@ impl Application {
             .port();
 
         let router = Router::new()
+            .layer(TraceLayer::new_for_http())
             .layer(OtelInResponseLayer)
             .layer(OtelAxumLayer::default())
             .route("/health", get(health_check))
