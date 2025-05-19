@@ -4,6 +4,7 @@ use axum::{
     routing::{get, Router},
     serve::Serve,
 };
+use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use tokio::net::TcpListener;
 
 use crate::{config::Settings, error::Error};
@@ -28,6 +29,8 @@ impl Application {
             .port();
 
         let router = Router::new()
+            .layer(OtelInResponseLayer)
+            .layer(OtelAxumLayer::default())
             .route("/health", get(health_check))
             .fallback(not_found);
 
