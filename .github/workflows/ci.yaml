@@ -13,6 +13,8 @@ env:
   CARGO_TERM_COLOR: always
   SQLX_VERSION: 0.8.0
   SQLX_FEATURES: 'rustls,postgres'
+  APP_USER: app
+  APP_USER_PWD: password
 
 jobs:
   test:
@@ -22,9 +24,12 @@ jobs:
       postgres:
         image: postgres:14
         env:
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: 5432
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
           POSTGRES_DB: postgres
+          POSTGRES_REQUIRE_SSL: false
         ports:
           - 5432:5432
     steps:
@@ -85,9 +90,12 @@ jobs:
       postgres:
         image: postgres:14
         env:
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: 5432
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
           POSTGRES_DB: postgres
+          POSTGRES_REQUIRE_SSL: false
         ports:
           - 5432:5432
     steps:
