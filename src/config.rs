@@ -80,22 +80,22 @@ impl Settings {
             .set_override("application.name", env!("CARGO_PKG_NAME"))?
             .set_override("application.version", env!("CARGO_PKG_VERSION"))?;
 
-        if let Ok(host) = std::env::var("POSTGRES_HOST") {
+        if let Some(host) = get_env_var("POSTGRES_HOST") {
             settings = settings.set_override("database.host", host)?;
         }
-        if let Ok(port) = std::env::var("POSTGRES_PORT") {
+        if let Some(port) = get_env_var("POSTGRES_PORT") {
             settings = settings.set_override("database.port", port)?;
         }
-        if let Ok(username) = std::env::var("POSTGRES_USER") {
+        if let Some(username) = get_env_var("POSTGRES_USER") {
             settings = settings.set_override("database.username", username)?;
         }
-        if let Ok(password) = std::env::var("POSTGRES_PASSWORD") {
+        if let Some(password) = get_env_var("POSTGRES_PASSWORD") {
             settings = settings.set_override("database.password", password)?;
         }
-        if let Ok(database_name) = std::env::var("POSTGRES_DB") {
+        if let Some(database_name) = get_env_var("POSTGRES_DB") {
             settings = settings.set_override("database.database_name", database_name)?;
         }
-        if let Ok(require_ssl) = std::env::var("POSTGRES_REQUIRE_SSL") {
+        if let Some(require_ssl) = get_env_var("POSTGRES_REQUIRE_SSL") {
             settings = settings.set_override("database.require_ssl", require_ssl)?;
         }
 
@@ -105,6 +105,14 @@ impl Settings {
             .try_deserialize::<Settings>()
             .context("Failed to deserialize configuration")
     }
+}
+
+fn get_env_var(name: &str) -> Option<String> {
+    let var = std::env::var(name).ok()?;
+    if var.is_empty() {
+        return None;
+    }
+    Some(var)
 }
 
 pub enum Environment {
