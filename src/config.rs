@@ -7,6 +7,7 @@ use sqlx::postgres::{PgConnectOptions, PgSslMode};
 pub struct Settings {
     pub application: ApplicationSettings,
     pub database: DatabaseSettings,
+    pub rabbitmq: RabbitMQSettings,
 }
 
 #[derive(Deserialize)]
@@ -26,6 +27,12 @@ pub struct DatabaseSettings {
     pub password: String,
     pub database_name: String,
     pub require_ssl: bool,
+}
+
+#[derive(Deserialize)]
+pub struct RabbitMQSettings {
+    pub url: String,
+    pub exchange_name: String,
 }
 
 impl DatabaseSettings {
@@ -97,6 +104,12 @@ impl Settings {
         }
         if let Some(require_ssl) = get_env_var("POSTGRES_REQUIRE_SSL") {
             settings = settings.set_override("database.require_ssl", require_ssl)?;
+        }
+        if let Some(url) = get_env_var("RABBITMQ_URL") {
+            settings = settings.set_override("rabbitmq.url", url)?;
+        }
+        if let Some(exchange_name) = get_env_var("RABBITMQ_EXCHANGE_NAME") {
+            settings = settings.set_override("rabbitmq.exchange_name", exchange_name)?;
         }
 
         let settings = settings.build().context("Failed to build configuration")?;

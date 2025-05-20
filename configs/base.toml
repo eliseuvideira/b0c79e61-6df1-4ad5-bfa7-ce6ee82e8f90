@@ -11,3 +11,7 @@ username = "postgres"
 password = "password"
 database_name = "integrations"
 require_ssl = false
+
+[rabbitmq]
+url = "amqp://guest:guest@127.0.0.1:5672/%2F"
+exchange_name = "default_exchange"

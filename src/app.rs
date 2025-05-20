@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{Context, Result};
 use axum::{
     extract::{Request, State},
@@ -12,6 +14,7 @@ use axum_tracing_opentelemetry::{
     middleware::{OtelAxumLayer, OtelInResponseLayer},
     tracing_opentelemetry_instrumentation_sdk::find_current_trace_id,
 };
+use lapin::Channel;
 use metrics_exporter_prometheus::PrometheusHandle;
 use serde::{Deserialize, Serialize};
 use sqlx::{
@@ -27,6 +30,7 @@ use uuid::Uuid;
 use crate::{
     config::{DatabaseSettings, Settings},
     error::Error,
+    rabbitmq,
 };
 
 pub struct Application {
@@ -34,9 +38,20 @@ pub struct Application {
     server: Serve<Router, Router>,
 }
 
+#[derive(Debug)]
+struct AppState {
+    db: Pool<Postgres>,
+    channel: Channel,
+    exchange_name: String,
+}
+
 impl Application {
     pub async fn build(configuration: Settings, metrics_handle: PrometheusHandle) -> Result<Self> {
         let db_pool = get_db_pool(&configuration.database);
+
+        let (_, channel) = rabbitmq::connect(&configuration.rabbitmq).await?;
+
+        rabbitmq::declare_exchange(&channel, "default_exchange").await?;
 
         let address = format!(
             "{}:{}",
@@ -50,13 +65,20 @@ impl Application {
             .context("Failed to get local address")?
             .port();
 
+        let app_state = AppState {
+            db: db_pool,
+            channel,
+            exchange_name: configuration.rabbitmq.exchange_name,
+        };
+        let app_state = Arc::new(app_state);
+
         let router = Router::new()
             .route("/scrapper-jobs", post(create_scrapper_job))
             .layer(TraceLayer::new_for_http())
             .layer(from_fn(attach_trace_id))
             .layer(OtelInResponseLayer)
             .layer(OtelAxumLayer::default())
-            .with_state(db_pool)
+            .with_state(app_state)
             .route(
                 "/metrics",
                 get(move || std::future::ready(metrics_handle.render())),
@@ -105,9 +127,14 @@ struct CreateScrapperJobPayload {
     package_name: String,
 }
 
+#[derive(Debug, Serialize)]
+struct ScrapperJobMessage {
+    package_name: String,
+}
+
 #[instrument(name = "create_scrapper_job")]
 async fn create_scrapper_job(
-    State(db_pool): State<Pool<Postgres>>,
+    State(app_state): State<Arc<AppState>>,
     Json(payload): Json<CreateScrapperJobPayload>,
 ) -> Result<impl IntoResponse, Error> {
     let id = Uuid::now_v7();
@@ -115,7 +142,7 @@ async fn create_scrapper_job(
     let package_name = payload.package_name;
     let trace_id = find_current_trace_id();
 
-    let mut transaction = db_pool.begin().await?;
+    let mut transaction = app_state.db.begin().await?;
 
     let scrapper_job = insert_scrapper_job(
         &mut transaction,
@@ -123,13 +150,25 @@ async fn create_scrapper_job(
             id,
             registry_name,
             package_name,
-            trace_id,
+            trace_id: trace_id.clone(),
             created_at: Utc::now(),
         },
     )
     .await?;
 
     transaction.commit().await?;
+
+    let message = ScrapperJobMessage {
+        package_name: scrapper_job.package_name.clone(),
+    };
+
+    rabbitmq::publish_message(
+        &app_state.channel,
+        &app_state.exchange_name,
+        &scrapper_job.registry_name,
+        &message,
+    )
+    .await?;
 
     Ok((StatusCode::CREATED, Json(scrapper_job)))
 }

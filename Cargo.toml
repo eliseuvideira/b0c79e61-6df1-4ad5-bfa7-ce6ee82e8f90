@@ -10,6 +10,7 @@ axum-tracing-opentelemetry = "0.28.0"
 chrono = { version = "0.4.41", features = ["serde"] }
 config = "0.15.11"
 dotenvy = "0.15.7"
+lapin = "2.5.3"
 metrics = "0.24.2"
 metrics-exporter-prometheus = "0.17.0"
 opentelemetry = "0.29.1"
