@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO scrapper_jobs (id, registry_name, package_name, status, trace_id, created_at)\n        VALUES ($1, $2, $3, 'processing', $4, $5);\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "29e3d8ec8e46c34dce14544af91bed2242666a41a7a1d7d8f2110ff79f35b74f"
+}
