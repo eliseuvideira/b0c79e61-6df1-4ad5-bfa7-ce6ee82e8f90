@@ -162,6 +162,7 @@ struct CreateScrapperJobPayload {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ScrapperJobMessage {
+    job_id: Uuid,
     package_name: String,
 }
 
@@ -192,6 +193,7 @@ async fn create_scrapper_job(
     transaction.commit().await?;
 
     let message = ScrapperJobMessage {
+        job_id: scrapper_job.id,
         package_name: scrapper_job.package_name.clone(),
     };
 
@@ -314,42 +316,12 @@ pub async fn consume_message(
     .await?;
 
     if package.is_some() {
-        let query = sqlx::query!(
-            r#"UPDATE packages SET name = $1, version = $2, downloads = $3 WHERE id = $4;"#,
-            json_data.name,
-            json_data.version,
-            json_data.downloads as i64,
-            json_data.id,
-        );
-
-        let result = transaction
-            .execute(query)
-            .instrument(instrument_query("UPDATE", "UPDATE.integrations.packages"))
-            .await?;
-        let rows_affected = result.rows_affected();
-        if rows_affected != 1 {
-            anyhow::bail!("Expected 1 row to be affected, got {}", rows_affected);
-        }
+        update_package_by_id(&mut transaction, json_data).await?;
     } else {
-        let query = sqlx::query!(
-            r#"INSERT INTO packages(id, name, version, downloads)
-            VALUES ($1, $2, $3, $4);
-            "#,
-            json_data.id,
-            json_data.name,
-            json_data.version,
-            json_data.downloads as i64,
-        );
-
-        let result = transaction
-            .execute(query)
-            .instrument(instrument_query("INSERT", "INSERT.integrations.packages"))
-            .await?;
-        let rows_affected = result.rows_affected();
-        if rows_affected != 1 {
-            anyhow::bail!("Expected 1 row to be affected, got {}", rows_affected);
-        }
+        insert_package(&mut transaction, json_data).await?;
     }
+
+    complete_scrapper_job(&mut transaction, message.job_id).await?;
 
     transaction.commit().await?;
     Ok(())
@@ -411,4 +383,68 @@ pub async fn handle_new_message(
                 .expect("nack");
         }
     }
+}
+
+#[instrument(name = "update_package_by_id", skip_all)]
+async fn update_package_by_id(
+    transaction: &mut Transaction<'static, Postgres>,
+    package: PackageOutput,
+) -> Result<()> {
+    let query = sqlx::query!(
+        r#"UPDATE packages SET name = $1, version = $2, downloads = $3 WHERE id = $4;"#,
+        package.name,
+        package.version,
+        package.downloads as i64,
+        package.id,
+    );
+
+    let result = transaction.execute(query).await?;
+    let rows_affected = result.rows_affected();
+    if rows_affected != 1 {
+        anyhow::bail!("Expected 1 row to be affected, got {}", rows_affected);
+    }
+
+    Ok(())
+}
+
+#[instrument(name = "insert_package", skip_all)]
+async fn insert_package(
+    transaction: &mut Transaction<'static, Postgres>,
+    package: PackageOutput,
+) -> Result<()> {
+    let query = sqlx::query!(
+        r#"INSERT INTO packages(id, name, version, downloads)
+        VALUES ($1, $2, $3, $4);
+        "#,
+        package.id,
+        package.name,
+        package.version,
+        package.downloads as i64,
+    );
+
+    let result = transaction.execute(query).await?;
+    let rows_affected = result.rows_affected();
+    if rows_affected != 1 {
+        anyhow::bail!("Expected 1 row to be affected, got {}", rows_affected);
+    }
+
+    Ok(())
+}
+
+#[instrument(name = "complete_scrapper_job", skip(transaction))]
+async fn complete_scrapper_job(
+    transaction: &mut Transaction<'static, Postgres>,
+    job_id: Uuid,
+) -> Result<()> {
+    let query = sqlx::query!(
+        r#"UPDATE scrapper_jobs SET status = 'completed' WHERE id = $1;"#,
+        job_id
+    );
+    let result = transaction.execute(query).await?;
+    let rows_affected = result.rows_affected();
+    if rows_affected != 1 {
+        anyhow::bail!("Expected 1 row to be affected, got {}", rows_affected);
+    }
+
+    Ok(())
 }
