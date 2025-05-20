@@ -134,11 +134,11 @@ where
             Resource::builder()
                 .with_attribute(KeyValue::new(
                     resource::SERVICE_NAME,
-                    std::env::var("CARGO_PKG_NAME").unwrap(),
+                    std::env::var("CARGO_PKG_NAME").unwrap_or_else(|_| "integrations-api".to_string()),
                 ))
                 .with_attribute(KeyValue::new(
                     resource::SERVICE_VERSION,
-                    std::env::var("CARGO_PKG_VERSION").unwrap(),
+                    std::env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.1.0".to_string()),
                 ))
                 .build(),
         )

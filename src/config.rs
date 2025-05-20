@@ -8,6 +8,7 @@ pub struct Settings {
     pub application: ApplicationSettings,
     pub database: DatabaseSettings,
     pub rabbitmq: RabbitMQSettings,
+    pub minio: MinioSettings,
 }
 
 #[derive(Deserialize)]
@@ -33,6 +34,13 @@ pub struct DatabaseSettings {
 pub struct RabbitMQSettings {
     pub url: String,
     pub exchange_name: String,
+}
+
+#[derive(Deserialize)]
+pub struct MinioSettings {
+    pub url: String,
+    pub username: String,
+    pub password: String,
 }
 
 impl DatabaseSettings {

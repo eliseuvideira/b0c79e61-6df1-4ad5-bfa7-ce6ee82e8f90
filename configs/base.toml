@@ -15,3 +15,8 @@ require_ssl = false
 [rabbitmq]
 url = "amqp://guest:guest@127.0.0.1:5672/%2F"
 exchange_name = "default_exchange"
+
+[minio]
+url = "http://127.0.0.1:9000"
+username = "minioadmin"
+password = "minioadmin"
