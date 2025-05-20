@@ -1692,6 +1692,7 @@ dependencies = [
  "chrono",
  "config",
  "dotenvy",
+ "futures-lite 2.6.0",
  "lapin",
  "metrics",
  "metrics-exporter-prometheus",

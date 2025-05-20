@@ -14,7 +14,8 @@ use axum_tracing_opentelemetry::{
     middleware::{OtelAxumLayer, OtelInResponseLayer},
     tracing_opentelemetry_instrumentation_sdk::find_current_trace_id,
 };
-use lapin::Channel;
+use futures_lite::stream::StreamExt;
+use lapin::{options::BasicAckOptions, Channel, Consumer};
 use metrics_exporter_prometheus::PrometheusHandle;
 use serde::{Deserialize, Serialize};
 use sqlx::{
@@ -22,7 +23,7 @@ use sqlx::{
     types::chrono::{DateTime, Utc},
     Executor, Pool, Postgres, Transaction,
 };
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, sync::Mutex};
 use tower_http::trace::TraceLayer;
 use tracing::{debug_span, instrument, Instrument};
 use uuid::Uuid;
@@ -36,6 +37,7 @@ use crate::{
 pub struct Application {
     port: u16,
     server: Serve<Router, Router>,
+    consumer: Arc<Mutex<Consumer>>,
 }
 
 #[derive(Debug)]
@@ -67,7 +69,7 @@ impl Application {
 
         let app_state = AppState {
             db: db_pool,
-            channel,
+            channel: channel.clone(),
             exchange_name: configuration.rabbitmq.exchange_name,
         };
         let app_state = Arc::new(app_state);
@@ -87,11 +89,23 @@ impl Application {
             .fallback(not_found);
 
         let server = axum::serve(listener, router);
+        let consumer = rabbitmq::create_consumer(&channel, "output_parser").await?;
 
-        Ok(Self { port, server })
+        Ok(Self {
+            port,
+            server,
+            consumer: Arc::new(Mutex::new(consumer)),
+        })
     }
 
     pub async fn run_until_stopped(self) -> Result<()> {
+        let _ = tokio::spawn(async move {
+            let mut consumer = self.consumer.lock().await;
+            while let Some(Ok(delivery)) = consumer.next().await {
+                delivery.ack(BasicAckOptions::default()).await.expect("ack");
+            }
+        });
+
         self.server.await?;
 
         Ok(())

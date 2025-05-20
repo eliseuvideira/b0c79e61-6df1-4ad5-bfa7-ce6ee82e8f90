@@ -1,8 +1,8 @@
 use anyhow::Result;
 use lapin::{
-    options::{BasicPublishOptions, ExchangeDeclareOptions},
+    options::{BasicConsumeOptions, BasicPublishOptions, ExchangeDeclareOptions},
     types::{AMQPValue, FieldTable},
-    BasicProperties, Channel, Connection, ConnectionProperties, ExchangeKind,
+    BasicProperties, Channel, Connection, ConnectionProperties, Consumer, ExchangeKind,
 };
 use opentelemetry::global;
 use serde::Serialize;
@@ -89,4 +89,18 @@ pub async fn publish_message<T: Serialize>(
         .await?;
 
     Ok(())
+}
+
+#[instrument(name = "create_consumer", skip_all, fields(queue = %queue_name))]
+pub async fn create_consumer(channel: &Channel, queue_name: &str) -> Result<Consumer> {
+    let consumer = channel
+        .basic_consume(
+            queue_name,
+            "",
+            BasicConsumeOptions::default(),
+            FieldTable::default(),
+        )
+        .await?;
+
+    Ok(consumer)
 }
