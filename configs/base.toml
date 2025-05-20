@@ -3,3 +3,11 @@ environment = "local"
 [application]
 host = "0.0.0.0"
 port = 8000
+
+[database]
+host = "127.0.0.1"
+port = 5432
+username = "postgres"
+password = "password"
+database_name = "integrations"
+require_ssl = false
