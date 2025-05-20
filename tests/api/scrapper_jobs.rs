@@ -1,4 +1,5 @@
 use anyhow::Result;
+use lapin::options::BasicGetOptions;
 use reqwest::StatusCode;
 use serde_json::json;
 
@@ -77,6 +78,37 @@ async fn test_create_scrapper_job_returns_scrapper_job_object() -> Result<()> {
     assert_eq!(body["id"].is_string(), true);
     assert_eq!(body["registry_name"], "crates.io");
     assert_eq!(body["package_name"], "serde");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_create_scrapper_job_publishes_to_rabbitmq() -> Result<()> {
+    // Arrange
+    let app = spawn_app().await?;
+    let client = reqwest::Client::new();
+
+    // Act
+    client
+        .post(format!("{}/scrapper-jobs", app.address))
+        .json(&json!({
+            "registry_name": "crates.io_queue",
+            "package_name": "serde",
+        }))
+        .send()
+        .await?;
+
+    // Assert
+    let channel = &app.channel;
+    let message = channel
+        .basic_get("crates.io_queue", BasicGetOptions::default())
+        .await?;
+    assert_eq!(message.is_some(), true);
+
+    if let Some(delivery) = message {
+        let payload = serde_json::from_slice::<serde_json::Value>(&delivery.data)?;
+        assert_eq!(payload["package_name"], "serde");
+    }
 
     Ok(())
 }
