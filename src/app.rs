@@ -6,7 +6,7 @@ use axum::{
     extract::{Request, State},
     http::StatusCode,
     middleware::{from_fn, Next},
-    response::{IntoResponse, Response},
+    response::{Html, IntoResponse, Response},
     routing::{get, post, Router},
     serve::Serve,
     Json,
@@ -26,6 +26,7 @@ use opentelemetry::{
     global::{self},
     propagation::Extractor,
 };
+use scalar_doc::Documentation;
 use serde::{Deserialize, Serialize};
 use sqlx::{
     postgres::PgPoolOptions,
@@ -88,12 +89,17 @@ impl Application {
         };
         let app_state = Arc::new(app_state);
 
+        let prometheus_layer = axum_prometheus::PrometheusMetricLayer::default();
+
         let router = Router::new()
             .route("/scrapper-jobs", post(create_scrapper_job))
+            .route("/", get(index))
+            .route("/openapi", get(openapi))
             .layer(TraceLayer::new_for_http())
             .layer(from_fn(attach_trace_id))
             .layer(OtelInResponseLayer)
             .layer(OtelAxumLayer::default())
+            .layer(prometheus_layer)
             .with_state(app_state)
             .route(
                 "/metrics",
@@ -447,4 +453,16 @@ async fn complete_scrapper_job(
     }
 
     Ok(())
+}
+
+async fn index() -> impl IntoResponse {
+    Html(
+        Documentation::new("Api Documentation title", "/openapi")
+            .build()
+            .unwrap(),
+    )
+}
+
+async fn openapi() -> &'static str {
+    include_str!("../openapi.json")
 }

@@ -17,7 +17,6 @@ pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
     pub channel: Channel,
-    pub exchange_name: String,
 }
 
 pub fn init_metrics() -> (PrometheusHandle, PrometheusRecorder) {
@@ -85,7 +84,6 @@ pub async fn spawn_app() -> Result<TestApp> {
         address,
         db_pool,
         channel,
-        exchange_name,
     })
 }
 

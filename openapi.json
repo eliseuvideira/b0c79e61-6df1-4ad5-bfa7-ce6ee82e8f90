@@ -1,0 +1,93 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Integrations API",
+    "description": "API for package registry scrapper integrations",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/scrapper-jobs": {
+      "post": {
+        "summary": "Create a new scrapper job",
+        "description": "Initiates a scrapper job for the specified package from the registry",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScrapperJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScrapperJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ScrapperJobRequest": {
+        "type": "object",
+        "required": ["registry_name", "package_name"],
+        "properties": {
+          "registry_name": {
+            "type": "string",
+            "enum": ["crates.io", "jsr.io"],
+            "description": "Name of the package registry"
+          },
+          "package_name": {
+            "type": "string",
+            "description": "Name of the package to scrap"
+          }
+        }
+      },
+      "ScrapperJobResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the created job"
+          },
+          "registry_name": {
+            "type": "string",
+            "enum": ["crates.io"],
+            "description": "Name of the package registry"
+          },
+          "package_name": {
+            "type": "string",
+            "description": "Name of the package"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["processing", "complete"],
+            "description": "Status of the job"
+          },
+          "trace_id": {
+            "type": "string",
+            "description": "Trace identifier for logging and debugging"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the job was created"
+          }
+        }
+      }
+    }
+  }
+}
