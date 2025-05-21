@@ -33,7 +33,7 @@ use sqlx::{
     types::chrono::{DateTime, Utc},
     Executor, Pool, Postgres, Transaction,
 };
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, try_join};
 use tower_http::trace::TraceLayer;
 use tracing::{debug_span, info_span, instrument, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -120,18 +120,29 @@ impl Application {
     }
 
     pub async fn run_until_stopped(self) -> Result<()> {
-        let _ = tokio::spawn(async move {
-            let mut consumer = rabbitmq::create_consumer(&self.channel, "output_parser")
-                .await
-                .expect("Cannot create consumer");
+        let consumer_handle =
+            Application::run_consumer(self.channel, self.minio_client, self.db_pool);
+        let server_handle = Application::run_server(self.server);
 
-            while let Some(Ok(delivery)) = consumer.next().await {
-                handle_new_message(&delivery, self.minio_client.clone(), self.db_pool.clone())
-                    .await;
-            }
-        });
+        try_join!(consumer_handle, server_handle)?;
 
-        self.server.await?;
+        Ok(())
+    }
+
+    async fn run_server(server: Serve<Router, Router>) -> Result<()> {
+        server.await.context("Server failed to start")
+    }
+
+    async fn run_consumer(
+        channel: Channel,
+        minio_client: MinioClient,
+        db_pool: Pool<Postgres>,
+    ) -> Result<()> {
+        let mut consumer = rabbitmq::create_consumer(&channel, "output_parser").await?;
+
+        while let Some(Ok(delivery)) = consumer.next().await {
+            handle_new_message(&delivery, minio_client.clone(), db_pool.clone()).await;
+        }
 
         Ok(())
     }
@@ -305,7 +316,7 @@ pub async fn consume_message(
     let response = minio_client
         .get_object()
         .bucket("outputs")
-        .key(&format!("outputs/{}.json", message.package_name))
+        .key(format!("outputs/{}.json", message.package_name))
         .send()
         .await?;
 
@@ -373,7 +384,7 @@ pub async fn handle_new_message(
 
     span.set_parent(context);
 
-    match consume_message(&delivery, minio_client, db_pool)
+    match consume_message(delivery, minio_client, db_pool)
         .instrument(span)
         .await
     {
