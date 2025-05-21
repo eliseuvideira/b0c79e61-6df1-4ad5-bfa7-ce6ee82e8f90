@@ -15,6 +15,15 @@ require_ssl = false
 [rabbitmq]
 url = "amqp://guest:guest@127.0.0.1:5672/%2F"
 exchange_name = "default_exchange"
+queues = [
+  "integration.crates.io",
+  "integration.crates.io.parser",
+  "integration.jsr.io",
+  "integration.jsr.io.parser",
+  "integration.npmjs.com",
+  "integration.npmjs.com.parser",
+]
+queue_consumer = "consumer"
 
 [minio]
 url = "http://127.0.0.1:9000"

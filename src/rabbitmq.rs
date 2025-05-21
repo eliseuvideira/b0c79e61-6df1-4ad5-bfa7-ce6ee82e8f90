@@ -1,6 +1,9 @@
 use anyhow::Result;
 use lapin::{
-    options::{BasicConsumeOptions, BasicPublishOptions, ExchangeDeclareOptions},
+    options::{
+        BasicConsumeOptions, BasicPublishOptions, ExchangeDeclareOptions, QueueBindOptions,
+        QueueDeclareOptions,
+    },
     types::{AMQPValue, FieldTable},
     BasicProperties, Channel, Connection, ConnectionProperties, Consumer, ExchangeKind,
 };
@@ -19,7 +22,7 @@ pub async fn connect(settings: &RabbitMQSettings) -> Result<(Connection, Channel
     Ok((connection, channel))
 }
 
-#[instrument(name = "declare_exchange", skip_all)]
+#[instrument(name = "declare_exchange", skip(channel))]
 pub async fn declare_exchange(channel: &Channel, exchange_name: &str) -> Result<()> {
     channel
         .exchange_declare(
@@ -32,6 +35,49 @@ pub async fn declare_exchange(channel: &Channel, exchange_name: &str) -> Result<
             FieldTable::default(),
         )
         .await?;
+
+    Ok(())
+}
+
+#[instrument(name = "declare_queue", skip(channel))]
+pub async fn declare_queue(channel: &Channel, queue_name: &str) -> Result<()> {
+    channel
+        .queue_declare(
+            queue_name,
+            QueueDeclareOptions {
+                durable: true,
+                ..QueueDeclareOptions::default()
+            },
+            FieldTable::default(),
+        )
+        .await?;
+
+    Ok(())
+}
+
+#[instrument(name = "bind_queue", skip(channel))]
+pub async fn bind_queue(channel: &Channel, exchange_name: &str, queue_name: &str) -> Result<()> {
+    channel
+        .queue_bind(
+            queue_name,
+            exchange_name,
+            queue_name,
+            QueueBindOptions::default(),
+            FieldTable::default(),
+        )
+        .await?;
+
+    Ok(())
+}
+
+#[instrument(name = "declare_and_bind_queue", skip(channel))]
+pub async fn declare_and_bind_queue(
+    channel: &Channel,
+    queue_name: &str,
+    exchange_name: &str,
+) -> Result<()> {
+    declare_queue(channel, queue_name).await?;
+    bind_queue(channel, exchange_name, queue_name).await?;
 
     Ok(())
 }

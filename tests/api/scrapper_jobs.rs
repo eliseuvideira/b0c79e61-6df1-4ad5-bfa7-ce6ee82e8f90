@@ -92,16 +92,17 @@ async fn test_create_scrapper_job_publishes_to_rabbitmq() -> Result<()> {
     client
         .post(format!("{}/scrapper-jobs", app.address))
         .json(&json!({
-            "registry_name": "crates.io_queue",
+            "registry_name": app.queues[0],
             "package_name": "serde",
         }))
         .send()
         .await?;
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     // Assert
     let channel = &app.channel;
     let message = channel
-        .basic_get("crates.io_queue", BasicGetOptions::default())
+        .basic_get(&app.queues[0], BasicGetOptions::default())
         .await?;
     assert_eq!(message.is_some(), true);
 

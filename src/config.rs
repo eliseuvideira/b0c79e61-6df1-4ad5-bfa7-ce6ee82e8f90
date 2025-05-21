@@ -34,6 +34,8 @@ pub struct DatabaseSettings {
 pub struct RabbitMQSettings {
     pub url: String,
     pub exchange_name: String,
+    pub queues: Vec<String>,
+    pub queue_consumer: String,
 }
 
 #[derive(Deserialize)]

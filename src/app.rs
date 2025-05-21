@@ -51,6 +51,7 @@ pub struct Application {
     minio_client: MinioClient,
     db_pool: Pool<Postgres>,
     channel: Channel,
+    queue_consumer: String,
 }
 
 #[derive(Debug)]
@@ -66,7 +67,23 @@ impl Application {
 
         let (_, channel) = rabbitmq::connect(&configuration.rabbitmq).await?;
 
-        rabbitmq::declare_exchange(&channel, "default_exchange").await?;
+        rabbitmq::declare_exchange(&channel, &configuration.rabbitmq.exchange_name).await?;
+        for queue in configuration.rabbitmq.queues {
+            rabbitmq::declare_and_bind_queue(
+                &channel,
+                &queue,
+                &configuration.rabbitmq.exchange_name,
+            )
+            .await?;
+        }
+        rabbitmq::declare_and_bind_queue(
+            &channel,
+            &configuration.rabbitmq.queue_consumer,
+            &configuration.rabbitmq.exchange_name,
+        )
+        .await?;
+
+        let queue_consumer = configuration.rabbitmq.queue_consumer;
 
         let minio_client = minio::create_minio_client(&configuration.minio).await?;
 
@@ -116,12 +133,17 @@ impl Application {
             minio_client,
             db_pool,
             channel,
+            queue_consumer,
         })
     }
 
     pub async fn run_until_stopped(self) -> Result<()> {
-        let consumer_handle =
-            Application::run_consumer(self.channel, self.minio_client, self.db_pool);
+        let consumer_handle = Application::run_consumer(
+            self.channel,
+            self.minio_client,
+            self.db_pool,
+            self.queue_consumer,
+        );
         let server_handle = Application::run_server(self.server);
 
         try_join!(consumer_handle, server_handle)?;
@@ -137,8 +159,9 @@ impl Application {
         channel: Channel,
         minio_client: MinioClient,
         db_pool: Pool<Postgres>,
+        consumer_queue: String,
     ) -> Result<()> {
-        let mut consumer = rabbitmq::create_consumer(&channel, "output_parser").await?;
+        let mut consumer = rabbitmq::create_consumer(&channel, &consumer_queue).await?;
 
         while let Some(Ok(delivery)) = consumer.next().await {
             handle_new_message(&delivery, minio_client.clone(), db_pool.clone()).await;
