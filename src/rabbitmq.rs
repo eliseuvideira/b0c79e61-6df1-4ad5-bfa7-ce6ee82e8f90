@@ -15,11 +15,10 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::config::RabbitMQSettings;
 
 #[instrument(name = "rabbitmq_connect", skip_all)]
-pub async fn connect(settings: &RabbitMQSettings) -> Result<(Connection, Channel)> {
+pub async fn connect(settings: &RabbitMQSettings) -> Result<Connection> {
     let connection = Connection::connect(&settings.url, ConnectionProperties::default()).await?;
-    let channel = connection.create_channel().await?;
 
-    Ok((connection, channel))
+    Ok(connection)
 }
 
 #[instrument(name = "declare_exchange", skip(channel))]

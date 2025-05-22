@@ -166,3 +166,28 @@ fn init_propagator() {
 
     opentelemetry::global::set_text_map_propagator(propagators);
 }
+
+#[derive(Debug, Clone, Copy)]
+pub enum Operation {
+    Insert,
+    Update,
+    Delete,
+    Select,
+}
+
+impl std::fmt::Display for Operation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+pub fn instrument_query(operation: Operation, table_name: &str) -> tracing::Span {
+    tracing::debug_span!(
+        "db_query",
+        db.system = "postgres",
+        db.operation = %operation,
+        otel.name = format!("{:?}.{}", operation, table_name),
+        otel.kind = "CLIENT",
+        otel.status_code = tracing::field::Empty,
+    )
+}

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{Context, Result};
 use aws_sdk_s3::Client as MinioClient;
@@ -17,9 +17,9 @@ use axum_tracing_opentelemetry::{
 };
 use futures_lite::stream::StreamExt;
 use lapin::{
-    message::Delivery,
     options::{BasicAckOptions, BasicNackOptions},
-    Channel,
+    types::{AMQPValue, FieldTable, ShortString},
+    Connection,
 };
 use metrics_exporter_prometheus::PrometheusHandle;
 use opentelemetry::{
@@ -28,11 +28,7 @@ use opentelemetry::{
 };
 use scalar_doc::Documentation;
 use serde::{Deserialize, Serialize};
-use sqlx::{
-    postgres::PgPoolOptions,
-    types::chrono::{DateTime, Utc},
-    Executor, Pool, Postgres, Transaction,
-};
+use sqlx::{postgres::PgPoolOptions, types::chrono::Utc, Pool, Postgres};
 use tokio::{net::TcpListener, try_join};
 use tower_http::trace::TraceLayer;
 use tracing::{debug_span, info_span, instrument, Instrument};
@@ -41,6 +37,7 @@ use uuid::Uuid;
 
 use crate::{
     config::{DatabaseSettings, Settings},
+    db,
     error::Error,
     minio, rabbitmq,
 };
@@ -50,14 +47,15 @@ pub struct Application {
     server: Serve<Router, Router>,
     minio_client: MinioClient,
     db_pool: Pool<Postgres>,
-    channel: Channel,
+    rabbitmq_connection: Arc<Connection>,
     queue_consumer: String,
 }
 
 #[derive(Debug)]
 struct AppState {
     db: Pool<Postgres>,
-    channel: Channel,
+    rabbitmq_connection: Arc<Connection>,
+    integration_queues: HashMap<String, String>,
     exchange_name: String,
 }
 
@@ -65,13 +63,15 @@ impl Application {
     pub async fn build(configuration: Settings, metrics_handle: PrometheusHandle) -> Result<Self> {
         let db_pool = get_db_pool(&configuration.database);
 
-        let (_, channel) = rabbitmq::connect(&configuration.rabbitmq).await?;
+        let rabbitmq_connection = rabbitmq::connect(&configuration.rabbitmq).await?;
+        let rabbitmq_connection = Arc::new(rabbitmq_connection);
+        let channel = rabbitmq_connection.create_channel().await?;
 
         rabbitmq::declare_exchange(&channel, &configuration.rabbitmq.exchange_name).await?;
-        for queue in configuration.rabbitmq.queues {
+        for queue in configuration.rabbitmq.queues.iter() {
             rabbitmq::declare_and_bind_queue(
                 &channel,
-                &queue,
+                &queue.queue_name,
                 &configuration.rabbitmq.exchange_name,
             )
             .await?;
@@ -99,9 +99,17 @@ impl Application {
             .context("Failed to get local address")?
             .port();
 
+        let integration_queues = configuration
+            .rabbitmq
+            .queues
+            .into_iter()
+            .map(|queue| (queue.registry, queue.queue_name))
+            .collect();
+
         let app_state = AppState {
             db: db_pool.clone(),
-            channel: channel.clone(),
+            rabbitmq_connection: rabbitmq_connection.clone(),
+            integration_queues,
             exchange_name: configuration.rabbitmq.exchange_name,
         };
         let app_state = Arc::new(app_state);
@@ -132,14 +140,14 @@ impl Application {
             server,
             minio_client,
             db_pool,
-            channel,
+            rabbitmq_connection,
             queue_consumer,
         })
     }
 
     pub async fn run_until_stopped(self) -> Result<()> {
         let consumer_handle = Application::run_consumer(
-            self.channel,
+            self.rabbitmq_connection,
             self.minio_client,
             self.db_pool,
             self.queue_consumer,
@@ -156,15 +164,43 @@ impl Application {
     }
 
     async fn run_consumer(
-        channel: Channel,
+        rabbitmq_connection: Arc<Connection>,
         minio_client: MinioClient,
         db_pool: Pool<Postgres>,
         consumer_queue: String,
     ) -> Result<()> {
+        let channel = rabbitmq_connection.create_channel().await?;
         let mut consumer = rabbitmq::create_consumer(&channel, &consumer_queue).await?;
 
         while let Some(Ok(delivery)) = consumer.next().await {
-            handle_new_message(&delivery, minio_client.clone(), db_pool.clone()).await;
+            let message = serde_json::from_slice::<ScrapperJobMessage>(&delivery.data)?;
+            let span = if let Some(headers) = delivery.properties.headers() {
+                let extractor = FieldTableExtractor(&headers);
+                let context = global::get_text_map_propagator(|prop| prop.extract(&extractor));
+
+                let span = info_span!("consumer");
+                span.set_parent(context);
+                span
+            } else {
+                info_span!("consumer")
+            };
+            let _ = span.enter();
+
+            match consume_message(message, minio_client.clone(), db_pool.clone())
+                .instrument(span)
+                .await
+            {
+                Ok(_) => delivery.ack(BasicAckOptions::default()).await?,
+                Err(err) => {
+                    tracing::error!("Failed to process message: {:?}", err);
+                    delivery
+                        .nack(BasicNackOptions {
+                            multiple: false,
+                            requeue: false,
+                        })
+                        .await?;
+                }
+            }
         }
 
         Ok(())
@@ -218,12 +254,13 @@ async fn create_scrapper_job(
 
     let mut transaction = app_state.db.begin().await?;
 
-    let scrapper_job = insert_scrapper_job(
+    let scrapper_job = db::insert_scrapper_job(
         &mut transaction,
-        CreateScrapperJob {
+        db::ScrapperJob {
             id,
             registry_name,
             package_name,
+            status: "processing".to_string(),
             trace_id: trace_id.clone(),
             created_at: Utc::now(),
         },
@@ -236,84 +273,16 @@ async fn create_scrapper_job(
         job_id: scrapper_job.id,
         package_name: scrapper_job.package_name.clone(),
     };
+    let channel = app_state.rabbitmq_connection.create_channel().await?;
+    let queue_name = app_state
+        .integration_queues
+        .get(&scrapper_job.registry_name)
+        .context("Queue not found")?;
+    let routing_key = queue_name.clone();
 
-    rabbitmq::publish_message(
-        &app_state.channel,
-        &app_state.exchange_name,
-        &scrapper_job.registry_name,
-        &message,
-    )
-    .await?;
+    rabbitmq::publish_message(&channel, &app_state.exchange_name, &routing_key, &message).await?;
 
     Ok((StatusCode::CREATED, Json(scrapper_job)))
-}
-
-#[derive(Debug)]
-struct CreateScrapperJob {
-    id: Uuid,
-    registry_name: String,
-    package_name: String,
-    trace_id: Option<String>,
-    created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct ScrapperJob {
-    id: Uuid,
-    registry_name: String,
-    package_name: String,
-    status: String,
-    trace_id: Option<String>,
-    created_at: DateTime<Utc>,
-}
-
-#[instrument(name = "insert_scrapper_job", skip(transaction))]
-async fn insert_scrapper_job(
-    transaction: &mut Transaction<'static, Postgres>,
-    create_scrapper_job: CreateScrapperJob,
-) -> Result<ScrapperJob> {
-    let query = sqlx::query!(
-        r#"INSERT INTO scrapper_jobs (id, registry_name, package_name, status, trace_id, created_at)
-        VALUES ($1, $2, $3, 'processing', $4, $5);
-        "#,
-        create_scrapper_job.id,
-        create_scrapper_job.registry_name,
-        create_scrapper_job.package_name,
-        create_scrapper_job.trace_id,
-        create_scrapper_job.created_at,
-    );
-
-    let result = transaction
-        .execute(query)
-        .instrument(instrument_query(
-            "INSERT",
-            "INSERT.integrations.scrapper_jobs",
-        ))
-        .await?;
-
-    let rows_affected = result.rows_affected();
-    if rows_affected != 1 {
-        anyhow::bail!("Expected 1 row to be affected, got {}", rows_affected);
-    }
-
-    let scrapper_job = sqlx::query_as!(
-        ScrapperJob,
-        r#"SELECT id, registry_name, package_name, status, trace_id, created_at FROM scrapper_jobs WHERE id = $1"#,
-        create_scrapper_job.id
-    ).fetch_one(&mut **transaction).await?;
-
-    Ok(scrapper_job)
-}
-
-fn instrument_query(operation: &str, name: &str) -> tracing::Span {
-    debug_span!(
-        "db_query",
-        db.system = "postgres",
-        db.operation = operation,
-        otel.name = name,
-        otel.kind = "CLIENT",
-        otel.status_code = tracing::field::Empty,
-    )
 }
 
 pub fn get_db_pool(settings: &DatabaseSettings) -> Pool<Postgres> {
@@ -330,12 +299,10 @@ pub struct PackageOutput {
 
 #[instrument(name = "consume_message", skip_all)]
 pub async fn consume_message(
-    delivery: &Delivery,
+    message: ScrapperJobMessage,
     minio_client: MinioClient,
     db_pool: Pool<Postgres>,
 ) -> Result<()> {
-    let message = serde_json::from_slice::<ScrapperJobMessage>(&delivery.data)?;
-
     let response = minio_client
         .get_object()
         .bucket("outputs")
@@ -348,145 +315,35 @@ pub async fn consume_message(
 
     let mut transaction = db_pool.begin().await?;
 
-    let package = sqlx::query!(
-        r#"SELECT id FROM packages WHERE id = $1 FOR UPDATE;"#,
-        json_data.id
-    )
-    .fetch_optional(&mut *transaction)
-    .await?;
+    let package = db::Package {
+        id: json_data.id,
+        name: json_data.name,
+        version: json_data.version,
+        downloads: json_data.downloads as i64,
+    };
 
-    if package.is_some() {
-        update_package_by_id(&mut transaction, json_data).await?;
-    } else {
-        insert_package(&mut transaction, json_data).await?;
-    }
-
-    complete_scrapper_job(&mut transaction, message.job_id).await?;
+    db::upsert_package(&mut transaction, package).await?;
+    db::complete_scrapper_job(&mut transaction, message.job_id).await?;
 
     transaction.commit().await?;
+
     Ok(())
 }
 
-struct HeaderExtractor<'a>(&'a Delivery);
+pub struct FieldTableExtractor<'a>(&'a FieldTable);
 
-impl<'a> Extractor for HeaderExtractor<'a> {
+impl<'a> Extractor for FieldTableExtractor<'a> {
     fn get(&self, key: &str) -> Option<&str> {
-        if let Some(headers) = self.0.properties.headers() {
-            if let Some(value) = headers.inner().get(key) {
-                // Convert the AMQP value to a string
-                return match value {
-                    lapin::types::AMQPValue::LongString(s) => {
-                        std::str::from_utf8(s.as_bytes()).ok()
-                    }
-                    _ => None,
-                };
-            }
-        }
-        None
+        let key = ShortString::from(key.to_string());
+        self.0.inner().get(&key).and_then(|value| match value {
+            AMQPValue::LongString(s) => std::str::from_utf8(s.as_bytes()).ok(),
+            _ => None,
+        })
     }
 
     fn keys(&self) -> Vec<&str> {
-        if let Some(headers) = self.0.properties.headers() {
-            return headers.inner().keys().map(|k| k.as_str()).collect();
-        }
-        vec![]
+        self.0.inner().keys().map(|k| k.as_str()).collect()
     }
-}
-
-#[instrument(name = "handle_new_message", skip_all)]
-pub async fn handle_new_message(
-    delivery: &Delivery,
-    minio_client: MinioClient,
-    db_pool: Pool<Postgres>,
-) -> () {
-    let extractor = HeaderExtractor(delivery);
-
-    let context = global::get_text_map_propagator(|prop| prop.extract(&extractor));
-
-    let span = info_span!("consume_message");
-
-    span.set_parent(context);
-
-    match consume_message(delivery, minio_client, db_pool)
-        .instrument(span)
-        .await
-    {
-        Ok(_) => delivery.ack(BasicAckOptions::default()).await.expect("ack"),
-        Err(err) => {
-            tracing::error!("Failed to consume message: {:?}", err);
-            delivery
-                .nack(BasicNackOptions {
-                    multiple: false,
-                    requeue: false,
-                })
-                .await
-                .expect("nack");
-        }
-    }
-}
-
-#[instrument(name = "update_package_by_id", skip_all)]
-async fn update_package_by_id(
-    transaction: &mut Transaction<'static, Postgres>,
-    package: PackageOutput,
-) -> Result<()> {
-    let query = sqlx::query!(
-        r#"UPDATE packages SET name = $1, version = $2, downloads = $3 WHERE id = $4;"#,
-        package.name,
-        package.version,
-        package.downloads as i64,
-        package.id,
-    );
-
-    let result = transaction.execute(query).await?;
-    let rows_affected = result.rows_affected();
-    if rows_affected != 1 {
-        anyhow::bail!("Expected 1 row to be affected, got {}", rows_affected);
-    }
-
-    Ok(())
-}
-
-#[instrument(name = "insert_package", skip_all)]
-async fn insert_package(
-    transaction: &mut Transaction<'static, Postgres>,
-    package: PackageOutput,
-) -> Result<()> {
-    let query = sqlx::query!(
-        r#"INSERT INTO packages(id, name, version, downloads)
-        VALUES ($1, $2, $3, $4);
-        "#,
-        package.id,
-        package.name,
-        package.version,
-        package.downloads as i64,
-    );
-
-    let result = transaction.execute(query).await?;
-    let rows_affected = result.rows_affected();
-    if rows_affected != 1 {
-        anyhow::bail!("Expected 1 row to be affected, got {}", rows_affected);
-    }
-
-    Ok(())
-}
-
-#[instrument(name = "complete_scrapper_job", skip(transaction))]
-async fn complete_scrapper_job(
-    transaction: &mut Transaction<'static, Postgres>,
-    job_id: Uuid,
-) -> Result<()> {
-    let query = sqlx::query!(
-        r#"UPDATE scrapper_jobs SET status = 'completed' WHERE id = $1;"#,
-        job_id
-    );
-    let result = transaction.execute(query).await?;
-    let rows_affected = result.rows_affected();
-    if rows_affected != 1 {
-        anyhow::bail!("Expected 1 row to be affected, got {}", rows_affected);
-    }
-
-    Ok(())
 }
 
 async fn index() -> impl IntoResponse {

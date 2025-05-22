@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use integrations_api::{
     app::Application,
-    config::{DatabaseSettings, Settings},
+    config::{DatabaseSettings, IntegrationQueue, Settings},
     rabbitmq,
 };
 use lapin::Channel;
@@ -13,7 +13,7 @@ pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
     pub channel: Channel,
-    pub queues: Vec<String>,
+    pub queues: Vec<IntegrationQueue>,
 }
 
 pub fn init_metrics() -> (PrometheusHandle, PrometheusRecorder) {
@@ -28,7 +28,10 @@ pub async fn spawn_app() -> Result<TestApp> {
     dotenvy::dotenv().ok();
 
     let exchange_name = Uuid::new_v4().to_string();
-    let queues = vec![Uuid::new_v4().to_string()];
+    let queues = vec![IntegrationQueue {
+        registry: Uuid::new_v4().to_string(),
+        queue_name: Uuid::new_v4().to_string(),
+    }];
     let queue_consumer = Uuid::new_v4().to_string();
     let configuration = {
         let mut configuration = Settings::build()?;
@@ -45,7 +48,8 @@ pub async fn spawn_app() -> Result<TestApp> {
 
     let (metrics_handle, _) = init_metrics();
 
-    let (_, channel) = rabbitmq::connect(&configuration.rabbitmq).await?;
+    let rabbitmq_connection = rabbitmq::connect(&configuration.rabbitmq).await?;
+    let channel = rabbitmq_connection.create_channel().await?;
 
     let application = Application::build(configuration, metrics_handle)
         .await
