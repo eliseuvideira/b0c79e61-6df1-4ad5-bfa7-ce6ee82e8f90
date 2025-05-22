@@ -1,17 +1,11 @@
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
 use sqlx::PgConnection;
 use tracing::{instrument, Instrument};
 
-use crate::telemetry::{instrument_query, Operation};
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Package {
-    pub id: String,
-    pub name: String,
-    pub version: String,
-    pub downloads: i64,
-}
+use crate::{
+    models::package::Package,
+    telemetry::{instrument_query, Operation},
+};
 
 #[instrument(name = "insert_package", skip(conn))]
 pub async fn insert_package(conn: &mut PgConnection, package: Package) -> Result<Package> {

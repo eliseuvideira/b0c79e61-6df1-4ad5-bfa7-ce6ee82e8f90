@@ -39,7 +39,12 @@ use crate::{
     config::{DatabaseSettings, Settings},
     db,
     error::Error,
-    minio, rabbitmq,
+    minio,
+    models::{
+        package::Package,
+        scrapper_job::{ScrapperJob, ScrapperJobStatus},
+    },
+    rabbitmq,
 };
 
 pub struct Application {
@@ -175,7 +180,7 @@ impl Application {
         while let Some(Ok(delivery)) = consumer.next().await {
             let message = serde_json::from_slice::<ScrapperJobMessage>(&delivery.data)?;
             let span = if let Some(headers) = delivery.properties.headers() {
-                let extractor = FieldTableExtractor(&headers);
+                let extractor = FieldTableExtractor(headers);
                 let context = global::get_text_map_propagator(|prop| prop.extract(&extractor));
 
                 let span = info_span!("consumer");
@@ -256,11 +261,11 @@ async fn create_scrapper_job(
 
     let scrapper_job = db::insert_scrapper_job(
         &mut transaction,
-        db::ScrapperJob {
+        ScrapperJob {
             id,
             registry_name,
             package_name,
-            status: "processing".to_string(),
+            status: ScrapperJobStatus::Processing,
             trace_id: trace_id.clone(),
             created_at: Utc::now(),
         },
@@ -315,7 +320,7 @@ pub async fn consume_message(
 
     let mut transaction = db_pool.begin().await?;
 
-    let package = db::Package {
+    let package = Package {
         id: json_data.id,
         name: json_data.name,
         version: json_data.version,

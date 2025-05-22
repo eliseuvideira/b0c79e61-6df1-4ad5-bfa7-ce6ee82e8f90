@@ -1,50 +1,12 @@
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use sqlx::{
-    types::chrono::{DateTime, Utc},
-    PgConnection,
-};
+use sqlx::PgConnection;
 use tracing::{instrument, Instrument};
 use uuid::Uuid;
 
-use crate::telemetry::{instrument_query, Operation};
-
-#[derive(Debug, Deserialize, Serialize)]
-pub enum ScrapperJobStatus {
-    #[serde(rename = "pending")]
-    Processing,
-    #[serde(rename = "completed")]
-    Completed,
-}
-
-impl From<String> for ScrapperJobStatus {
-    fn from(s: String) -> Self {
-        match s.as_str() {
-            "pending" => ScrapperJobStatus::Processing,
-            "completed" => ScrapperJobStatus::Completed,
-            _ => ScrapperJobStatus::Processing,
-        }
-    }
-}
-
-impl ScrapperJobStatus {
-    pub fn to_string(&self) -> String {
-        match self {
-            ScrapperJobStatus::Processing => "pending".to_string(),
-            ScrapperJobStatus::Completed => "completed".to_string(),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ScrapperJob {
-    pub id: Uuid,
-    pub registry_name: String,
-    pub package_name: String,
-    pub status: String,
-    pub trace_id: Option<String>,
-    pub created_at: DateTime<Utc>,
-}
+use crate::{
+    models::scrapper_job::ScrapperJob,
+    telemetry::{instrument_query, Operation},
+};
 
 #[instrument(name = "insert_scrapper_job", skip(conn))]
 pub async fn insert_scrapper_job(
