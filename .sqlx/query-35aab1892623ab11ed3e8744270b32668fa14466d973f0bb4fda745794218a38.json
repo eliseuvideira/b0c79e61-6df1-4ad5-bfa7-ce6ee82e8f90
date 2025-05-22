@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, registry_name, package_name, status, trace_id, created_at FROM scrapper_jobs WHERE id = $1",
+  "query": "UPDATE scrapper_jobs SET status = 'completed' WHERE id = $1 RETURNING *;",
   "describe": {
     "columns": [
       {
@@ -48,5 +48,5 @@
       false
     ]
   },
-  "hash": "fb44b484f289d1c1cbde060328abe50106169443269f7d5a860507d75501fafc"
+  "hash": "35aab1892623ab11ed3e8744270b32668fa14466d973f0bb4fda745794218a38"
 }
