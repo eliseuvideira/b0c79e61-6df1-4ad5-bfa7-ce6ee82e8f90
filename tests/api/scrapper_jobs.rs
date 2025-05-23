@@ -10,13 +10,18 @@ async fn test_create_scrapper_job() -> Result<()> {
     // Arrange
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
-    let queues = app.queues;
+
+    let (registry_name, _) = app
+        .integration_queues
+        .iter()
+        .next()
+        .expect("No registry name");
 
     // Act
     let response = client
         .post(format!("{}/scrapper-jobs", app.address))
         .json(&json!({
-            "registry_name": queues[0].registry,
+            "registry_name": registry_name,
             "package_name": "serde",
         }))
         .send()
@@ -33,13 +38,17 @@ async fn test_create_scrapper_inserts_into_db() -> Result<()> {
     // Arrange
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
-    let queues = app.queues;
+    let (registry_name, _) = app
+        .integration_queues
+        .iter()
+        .next()
+        .expect("No registry name");
 
     // Act
     client
         .post(format!("{}/scrapper-jobs", app.address))
         .json(&json!({
-            "registry_name": queues[0].registry,
+            "registry_name": registry_name,
             "package_name": "serde",
         }))
         .send()
@@ -51,7 +60,7 @@ async fn test_create_scrapper_inserts_into_db() -> Result<()> {
         .fetch_all(db_pool)
         .await?;
     assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].registry_name, queues[0].registry);
+    assert_eq!(rows[0].registry_name, *registry_name);
     assert_eq!(rows[0].package_name, "serde");
 
     Ok(())
@@ -62,13 +71,17 @@ async fn test_create_scrapper_job_returns_scrapper_job_object() -> Result<()> {
     // Arrange
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
-    let queues = app.queues;
+    let (registry_name, _) = app
+        .integration_queues
+        .iter()
+        .next()
+        .expect("No registry name");
 
     // Act
     let response = client
         .post(format!("{}/scrapper-jobs", app.address))
         .json(&json!({
-            "registry_name": queues[0].registry,
+            "registry_name": registry_name,
             "package_name": "serde",
         }))
         .send()
@@ -79,7 +92,7 @@ async fn test_create_scrapper_job_returns_scrapper_job_object() -> Result<()> {
 
     let body = response.json::<serde_json::Value>().await?;
     assert_eq!(body["id"].is_string(), true);
-    assert_eq!(body["registry_name"], queues[0].registry);
+    assert_eq!(body["registry_name"], *registry_name);
     assert_eq!(body["package_name"], "serde");
 
     Ok(())
@@ -91,11 +104,17 @@ async fn test_create_scrapper_job_publishes_to_rabbitmq() -> Result<()> {
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
 
+    let (registry_name, queue_name) = app
+        .integration_queues
+        .iter()
+        .next()
+        .expect("No registry name");
+
     // Act
     client
         .post(format!("{}/scrapper-jobs", app.address))
         .json(&json!({
-            "registry_name": app.queues[0].registry,
+            "registry_name": registry_name,
             "package_name": "serde",
         }))
         .send()
@@ -105,7 +124,7 @@ async fn test_create_scrapper_job_publishes_to_rabbitmq() -> Result<()> {
     // Assert
     let channel = &app.channel;
     let message = channel
-        .basic_get(&app.queues[0].queue_name, BasicGetOptions::default())
+        .basic_get(&queue_name, BasicGetOptions::default())
         .await?;
     assert_eq!(message.is_some(), true);
 

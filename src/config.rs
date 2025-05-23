@@ -34,14 +34,9 @@ pub struct DatabaseSettings {
 pub struct RabbitMQSettings {
     pub url: String,
     pub exchange_name: String,
-    pub queues: Vec<IntegrationQueue>,
+    pub queues: Vec<String>,
+    pub registry_queues: Vec<(String, String)>,
     pub queue_consumer: String,
-}
-
-#[derive(Deserialize, Clone)]
-pub struct IntegrationQueue {
-    pub registry: String,
-    pub queue_name: String,
 }
 
 #[derive(Deserialize)]

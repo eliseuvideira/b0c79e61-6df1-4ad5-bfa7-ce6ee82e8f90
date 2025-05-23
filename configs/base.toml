@@ -16,14 +16,28 @@ require_ssl = false
 url = "amqp://guest:guest@127.0.0.1:5672/%2F"
 exchange_name = "default_exchange"
 queues = [
-  { registry = "crates.io", queue_name = "integration.crates.io" },
-  { registry = "crates.io", queue_name = "integration.crates.io.parser" },
-  { registry = "jsr.io", queue_name = "integration.jsr.io" },
-  { registry = "jsr.io", queue_name = "integration.jsr.io.parser" },
-  { registry = "npmjs.com", queue_name = "integration.npmjs.com" },
-  { registry = "npmjs.com", queue_name = "integration.npmjs.com.parser" },
+  "integration.crates.io",
+  "integration.crates.io.parser",
+  "integration.jsr.io",
+  "integration.jsr.io.parser",
+  "integration.npmjs.com",
+  "integration.npmjs.com.parser",
 ]
 queue_consumer = "consumer"
+registry_queues = [
+  [
+    "crates.io",
+    "integration.crates.io",
+  ],
+  [
+    "jsr.io",
+    "integration.jsr.io",
+  ],
+  [
+    "npmjs.com",
+    "integration.npmjs.com",
+  ],
+]
 
 [minio]
 url = "http://127.0.0.1:9000"

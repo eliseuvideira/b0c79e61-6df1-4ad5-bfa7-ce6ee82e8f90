@@ -25,13 +25,20 @@ struct ErrorResponse {
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         match self {
-            Error::Io(_) | Error::Unknown(_) | Error::Sqlx(_) | Error::RabbitMQ(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    message: "Internal Server Error".to_string(),
-                }),
-            )
-                .into_response(),
+            Error::Io(_) | Error::Unknown(_) | Error::Sqlx(_) | Error::RabbitMQ(_) => {
+                tracing::error!(
+                    error = ?self,
+                    "API Error"
+                );
+
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse {
+                        message: "Internal Server Error".to_string(),
+                    }),
+                )
+                    .into_response()
+            }
         }
     }
 }

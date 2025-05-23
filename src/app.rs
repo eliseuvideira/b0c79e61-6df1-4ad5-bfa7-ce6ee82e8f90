@@ -56,7 +56,6 @@ pub struct Application {
     queue_consumer: String,
 }
 
-#[derive(Debug)]
 struct AppState {
     db: Pool<Postgres>,
     rabbitmq_connection: Arc<Connection>,
@@ -76,7 +75,7 @@ impl Application {
         for queue in configuration.rabbitmq.queues.iter() {
             rabbitmq::declare_and_bind_queue(
                 &channel,
-                &queue.queue_name,
+                &queue,
                 &configuration.rabbitmq.exchange_name,
             )
             .await?;
@@ -104,12 +103,8 @@ impl Application {
             .context("Failed to get local address")?
             .port();
 
-        let integration_queues = configuration
-            .rabbitmq
-            .queues
-            .into_iter()
-            .map(|queue| (queue.registry, queue.queue_name))
-            .collect();
+        let integration_queues: HashMap<String, String> =
+            configuration.rabbitmq.registry_queues.into_iter().collect();
 
         let app_state = AppState {
             db: db_pool.clone(),
@@ -247,7 +242,7 @@ struct ScrapperJobMessage {
     package_name: String,
 }
 
-#[instrument(name = "create_scrapper_job")]
+#[instrument(name = "create_scrapper_job", skip(app_state))]
 async fn create_scrapper_job(
     State(app_state): State<Arc<AppState>>,
     Json(payload): Json<CreateScrapperJobPayload>,
@@ -258,6 +253,12 @@ async fn create_scrapper_job(
     let trace_id = find_current_trace_id();
 
     let mut transaction = app_state.db.begin().await?;
+
+    let routing_key = app_state
+        .integration_queues
+        .get(&registry_name)
+        .context("Registry not found")?
+        .clone();
 
     let scrapper_job = db::insert_scrapper_job(
         &mut transaction,
@@ -279,11 +280,6 @@ async fn create_scrapper_job(
         package_name: scrapper_job.package_name.clone(),
     };
     let channel = app_state.rabbitmq_connection.create_channel().await?;
-    let queue_name = app_state
-        .integration_queues
-        .get(&scrapper_job.registry_name)
-        .context("Queue not found")?;
-    let routing_key = queue_name.clone();
 
     rabbitmq::publish_message(&channel, &app_state.exchange_name, &routing_key, &message).await?;
 

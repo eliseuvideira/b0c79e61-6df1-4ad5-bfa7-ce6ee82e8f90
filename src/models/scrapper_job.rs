@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum ScrapperJobStatus {
-    #[serde(rename = "pending")]
+    #[serde(rename = "processing")]
     Processing,
     #[serde(rename = "completed")]
     Completed,
@@ -15,7 +15,7 @@ pub enum ScrapperJobStatus {
 impl From<String> for ScrapperJobStatus {
     fn from(s: String) -> Self {
         match s.as_str() {
-            "pending" => ScrapperJobStatus::Processing,
+            "processing" => ScrapperJobStatus::Processing,
             "completed" => ScrapperJobStatus::Completed,
             _ => {
                 tracing::warn!(status = s, "Invalid scrapper job status");
@@ -28,7 +28,7 @@ impl From<String> for ScrapperJobStatus {
 impl Display for ScrapperJobStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ScrapperJobStatus::Processing => write!(f, "pending"),
+            ScrapperJobStatus::Processing => write!(f, "processing"),
             ScrapperJobStatus::Completed => write!(f, "completed"),
         }
     }

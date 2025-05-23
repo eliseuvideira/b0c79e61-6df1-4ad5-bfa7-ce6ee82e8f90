@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use anyhow::{Context, Result};
 use integrations_api::{
     app::Application,
-    config::{DatabaseSettings, IntegrationQueue, Settings},
+    config::{DatabaseSettings, Settings},
     rabbitmq,
 };
 use lapin::Channel;
@@ -13,7 +15,7 @@ pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
     pub channel: Channel,
-    pub queues: Vec<IntegrationQueue>,
+    pub integration_queues: HashMap<String, String>,
 }
 
 pub fn init_metrics() -> (PrometheusHandle, PrometheusRecorder) {
@@ -28,10 +30,12 @@ pub async fn spawn_app() -> Result<TestApp> {
     dotenvy::dotenv().ok();
 
     let exchange_name = Uuid::new_v4().to_string();
-    let queues = vec![IntegrationQueue {
-        registry: Uuid::new_v4().to_string(),
-        queue_name: Uuid::new_v4().to_string(),
-    }];
+    let queues = vec![Uuid::new_v4().to_string()];
+    let registry_queues: Vec<(String, String)> = queues
+        .clone()
+        .into_iter()
+        .map(|queue| (Uuid::new_v4().to_string(), queue))
+        .collect();
     let queue_consumer = Uuid::new_v4().to_string();
     let configuration = {
         let mut configuration = Settings::build()?;
@@ -39,8 +43,9 @@ pub async fn spawn_app() -> Result<TestApp> {
         configuration.application.host = "127.0.0.1".to_string();
         configuration.application.port = 0;
         configuration.rabbitmq.exchange_name = exchange_name.clone();
-        configuration.rabbitmq.queues = queues.clone();
+        configuration.rabbitmq.queues = queues;
         configuration.rabbitmq.queue_consumer = queue_consumer.clone();
+        configuration.rabbitmq.registry_queues = registry_queues.clone();
         configuration
     };
 
@@ -50,6 +55,8 @@ pub async fn spawn_app() -> Result<TestApp> {
 
     let rabbitmq_connection = rabbitmq::connect(&configuration.rabbitmq).await?;
     let channel = rabbitmq_connection.create_channel().await?;
+
+    let integration_queues: HashMap<String, String> = registry_queues.into_iter().collect();
 
     let application = Application::build(configuration, metrics_handle)
         .await
@@ -62,7 +69,7 @@ pub async fn spawn_app() -> Result<TestApp> {
         address,
         db_pool,
         channel,
-        queues,
+        integration_queues,
     })
 }
 
