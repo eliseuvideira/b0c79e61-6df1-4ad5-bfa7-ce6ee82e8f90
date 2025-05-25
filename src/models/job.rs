@@ -5,41 +5,41 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize, Serialize)]
-pub enum ScrapperJobStatus {
+pub enum JobStatus {
     #[serde(rename = "processing")]
     Processing,
     #[serde(rename = "completed")]
     Completed,
 }
 
-impl From<String> for ScrapperJobStatus {
+impl From<String> for JobStatus {
     fn from(s: String) -> Self {
         match s.as_str() {
-            "processing" => ScrapperJobStatus::Processing,
-            "completed" => ScrapperJobStatus::Completed,
+            "processing" => JobStatus::Processing,
+            "completed" => JobStatus::Completed,
             _ => {
-                tracing::warn!(status = s, "Invalid scrapper job status");
-                ScrapperJobStatus::Processing
+                tracing::warn!(status = s, "Invalid job status");
+                JobStatus::Processing
             }
         }
     }
 }
 
-impl Display for ScrapperJobStatus {
+impl Display for JobStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ScrapperJobStatus::Processing => write!(f, "processing"),
-            ScrapperJobStatus::Completed => write!(f, "completed"),
+            JobStatus::Processing => write!(f, "processing"),
+            JobStatus::Completed => write!(f, "completed"),
         }
     }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ScrapperJob {
+pub struct Job {
     pub id: Uuid,
     pub registry_name: String,
     pub package_name: String,
-    pub status: ScrapperJobStatus,
+    pub status: JobStatus,
     pub trace_id: Option<String>,
     pub created_at: DateTime<Utc>,
 }

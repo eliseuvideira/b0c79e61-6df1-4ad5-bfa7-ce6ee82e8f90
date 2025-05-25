@@ -6,7 +6,7 @@ use serde_json::json;
 use crate::helpers::spawn_app;
 
 #[tokio::test]
-async fn test_create_scrapper_job() -> Result<()> {
+async fn test_create_job() -> Result<()> {
     // Arrange
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
@@ -19,7 +19,7 @@ async fn test_create_scrapper_job() -> Result<()> {
 
     // Act
     let response = client
-        .post(format!("{}/scrapper-jobs", app.address))
+        .post(format!("{}/jobs", app.address))
         .json(&json!({
             "registry_name": registry_name,
             "package_name": "serde",
@@ -34,7 +34,7 @@ async fn test_create_scrapper_job() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_create_scrapper_inserts_into_db() -> Result<()> {
+async fn test_create_job_inserts_into_db() -> Result<()> {
     // Arrange
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
@@ -46,7 +46,7 @@ async fn test_create_scrapper_inserts_into_db() -> Result<()> {
 
     // Act
     client
-        .post(format!("{}/scrapper-jobs", app.address))
+        .post(format!("{}/jobs", app.address))
         .json(&json!({
             "registry_name": registry_name,
             "package_name": "serde",
@@ -56,7 +56,7 @@ async fn test_create_scrapper_inserts_into_db() -> Result<()> {
 
     // Assert
     let db_pool = &app.db_pool;
-    let rows = sqlx::query!("SELECT * FROM scrapper_jobs;")
+    let rows = sqlx::query!("SELECT * FROM jobs;")
         .fetch_all(db_pool)
         .await?;
     assert_eq!(rows.len(), 1);
@@ -67,7 +67,7 @@ async fn test_create_scrapper_inserts_into_db() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_create_scrapper_job_returns_scrapper_job_object() -> Result<()> {
+async fn test_create_job_returns_job_object() -> Result<()> {
     // Arrange
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
@@ -79,7 +79,7 @@ async fn test_create_scrapper_job_returns_scrapper_job_object() -> Result<()> {
 
     // Act
     let response = client
-        .post(format!("{}/scrapper-jobs", app.address))
+        .post(format!("{}/jobs", app.address))
         .json(&json!({
             "registry_name": registry_name,
             "package_name": "serde",
@@ -99,7 +99,7 @@ async fn test_create_scrapper_job_returns_scrapper_job_object() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_create_scrapper_job_publishes_to_rabbitmq() -> Result<()> {
+async fn test_create_job_publishes_to_rabbitmq() -> Result<()> {
     // Arrange
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
@@ -112,7 +112,7 @@ async fn test_create_scrapper_job_publishes_to_rabbitmq() -> Result<()> {
 
     // Act
     client
-        .post(format!("{}/scrapper-jobs", app.address))
+        .post(format!("{}/jobs", app.address))
         .json(&json!({
             "registry_name": registry_name,
             "package_name": "serde",
@@ -135,3 +135,35 @@ async fn test_create_scrapper_job_publishes_to_rabbitmq() -> Result<()> {
 
     Ok(())
 }
+
+// #[tokio::test]
+// async fn test_get_jobs_returns_200() -> Result<()> {
+//     // Arrange
+//     let app = spawn_app().await?;
+//     let client = reqwest::Client::new();
+
+//     // Act
+//     let response = client.get(format!("{}/jobs", app.address)).send().await?;
+
+//     // Assert
+//     assert_eq!(response.status(), StatusCode::OK);
+
+//     Ok(())
+// }
+
+// #[tokio::test]
+// async fn test_get_jobs_returns_paginated_jobs() -> Result<()> {
+//     // Arrange
+//     let app = spawn_app().await?;
+//     let client = reqwest::Client::new();
+
+//     // Act
+//     let response = client.get(format!("{}/jobs", app.address)).send().await?;
+//     let body: serde_json::Value = response.json().await?;
+
+//     // Assert
+//     assert_eq!(body.get("data").is_some(), true);
+//     assert_eq!(body["has_more"], false);
+
+//     Ok(())
+// }

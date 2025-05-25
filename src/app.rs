@@ -42,7 +42,7 @@ use crate::{
     error::Error,
     models::{
         package::Package,
-        scrapper_job::{ScrapperJob, ScrapperJobStatus},
+        job::{Job, JobStatus},
     },
     services::{minio, rabbitmq},
 };
@@ -117,7 +117,7 @@ impl Application {
         let prometheus_layer = axum_prometheus::PrometheusMetricLayer::default();
 
         let router = Router::new()
-            .route("/scrapper-jobs", post(create_scrapper_job))
+            .route("/jobs", post(create_job))
             .route("/", get(index))
             .route("/openapi", get(openapi))
             .layer(TraceLayer::new_for_http())
@@ -240,21 +240,21 @@ async fn attach_trace_id(req: Request, next: Next) -> Response {
 }
 
 #[derive(Debug, Deserialize)]
-struct CreateScrapperJobPayload {
+struct CreateJobPayload {
     registry_name: String,
     package_name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct ScrapperJobMessage {
+struct JobMessage {
     job_id: Uuid,
     package_name: String,
 }
 
-#[instrument(name = "create_scrapper_job", skip(app_state))]
-async fn create_scrapper_job(
+#[instrument(name = "create_job", skip(app_state))]
+async fn create_job(
     State(app_state): State<Arc<AppState>>,
-    Json(payload): Json<CreateScrapperJobPayload>,
+    Json(payload): Json<CreateJobPayload>,
 ) -> Result<impl IntoResponse, Error> {
     let id = Uuid::now_v7();
     let registry_name = payload.registry_name;
@@ -269,13 +269,13 @@ async fn create_scrapper_job(
         .context("Registry not found")?
         .clone();
 
-    let scrapper_job = db::insert_scrapper_job(
+    let job = db::insert_job(
         &mut transaction,
-        ScrapperJob {
+        Job {
             id,
             registry_name,
             package_name,
-            status: ScrapperJobStatus::Processing,
+            status: JobStatus::Processing,
             trace_id: trace_id.clone(),
             created_at: Utc::now(),
         },
@@ -284,15 +284,15 @@ async fn create_scrapper_job(
 
     transaction.commit().await?;
 
-    let message = ScrapperJobMessage {
-        job_id: scrapper_job.id,
-        package_name: scrapper_job.package_name.clone(),
+    let message = JobMessage {
+        job_id: job.id,
+        package_name: job.package_name.clone(),
     };
     let channel = app_state.rabbitmq_connection.create_channel().await?;
 
     rabbitmq::publish_message(&channel, &app_state.exchange_name, &routing_key, &message).await?;
 
-    Ok((StatusCode::CREATED, Json(scrapper_job)))
+    Ok((StatusCode::CREATED, Json(job)))
 }
 
 pub fn get_db_pool(settings: &DatabaseSettings) -> Pool<Postgres> {
@@ -309,7 +309,7 @@ pub struct PackageOutput {
 
 #[instrument(name = "consume_message", skip_all)]
 pub async fn consume_message(
-    message: ScrapperJobMessage,
+    message: JobMessage,
     minio_client: MinioClient,
     db_pool: Pool<Postgres>,
 ) -> Result<()> {
@@ -333,7 +333,7 @@ pub async fn consume_message(
     };
 
     db::upsert_package(&mut transaction, package).await?;
-    db::complete_scrapper_job(&mut transaction, message.job_id).await?;
+    db::complete_job(&mut transaction, message.job_id).await?;
 
     transaction.commit().await?;
 
@@ -374,7 +374,7 @@ async fn parse_and_run_consume(
     minio_client: MinioClient,
     db_pool: Pool<Postgres>,
 ) -> Result<()> {
-    let message = serde_json::from_slice::<ScrapperJobMessage>(data)?;
+    let message = serde_json::from_slice::<JobMessage>(data)?;
     let span = if let Some(headers) = headers {
         let extractor = FieldTableExtractor(headers);
         let context = global::get_text_map_propagator(|prop| prop.extract(&extractor));

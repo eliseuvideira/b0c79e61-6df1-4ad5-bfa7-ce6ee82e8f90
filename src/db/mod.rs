@@ -1,5 +1,5 @@
 mod packages;
-mod scrapper_jobs;
+mod jobs;
 
 pub use packages::*;
-pub use scrapper_jobs::*;
+pub use jobs::*;

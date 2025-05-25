@@ -1,4 +1,4 @@
-CREATE TABLE scrapper_jobs (
+CREATE TABLE jobs (
     id UUID PRIMARY KEY,
     registry_name TEXT NOT NULL,
     package_name TEXT NOT NULL,
