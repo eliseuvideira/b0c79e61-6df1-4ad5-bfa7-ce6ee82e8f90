@@ -6,15 +6,15 @@ use serde_aux::prelude::*;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 
 #[derive(Deserialize)]
-pub struct Settings {
-    pub application: ApplicationSettings,
-    pub database: DatabaseSettings,
-    pub rabbitmq: RabbitMQSettings,
-    pub minio: MinioSettings,
+pub struct Config {
+    pub application: ApplicationConfig,
+    pub database: DatabaseConfig,
+    pub rabbitmq: RabbitMQConfig,
+    pub minio: MinioConfig,
 }
 
 #[derive(Deserialize)]
-pub struct ApplicationSettings {
+pub struct ApplicationConfig {
     pub name: String,
     pub version: String,
     pub host: String,
@@ -22,7 +22,7 @@ pub struct ApplicationSettings {
 }
 
 #[derive(Deserialize)]
-pub struct DatabaseSettings {
+pub struct DatabaseConfig {
     pub host: String,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
@@ -33,7 +33,7 @@ pub struct DatabaseSettings {
 }
 
 #[derive(Deserialize)]
-pub struct RabbitMQSettings {
+pub struct RabbitMQConfig {
     pub url: String,
     pub exchange_name: String,
     pub queues: Vec<String>,
@@ -42,13 +42,13 @@ pub struct RabbitMQSettings {
 }
 
 #[derive(Deserialize)]
-pub struct MinioSettings {
+pub struct MinioConfig {
     pub url: String,
     pub username: SecretString,
     pub password: SecretString,
 }
 
-impl MinioSettings {
+impl MinioConfig {
     pub fn credentials(&self) -> Credentials {
         Credentials::new(
             self.username.expose_secret(),
@@ -60,7 +60,7 @@ impl MinioSettings {
     }
 }
 
-impl DatabaseSettings {
+impl DatabaseConfig {
     pub fn connect_options(&self) -> PgConnectOptions {
         let ssl_mode = if self.require_ssl {
             PgSslMode::Require
@@ -86,7 +86,7 @@ impl DatabaseSettings {
     }
 }
 
-impl Settings {
+impl Config {
     pub fn build() -> Result<Self> {
         let base_path = std::env::current_dir().context("Failed to determine current directory")?;
         let configuration_directory = base_path.join("configs");
@@ -140,7 +140,7 @@ impl Settings {
         let settings = settings.build().context("Failed to build configuration")?;
 
         settings
-            .try_deserialize::<Settings>()
+            .try_deserialize::<Config>()
             .context("Failed to deserialize configuration")
     }
 }
@@ -154,15 +154,17 @@ fn get_env_var(name: &str) -> Option<String> {
 }
 
 pub enum Environment {
-    Local,
+    Development,
     Production,
+    Staging,
 }
 
 impl Environment {
     pub fn as_str(&self) -> &'static str {
         match self {
-            Environment::Local => "local",
+            Environment::Development => "dev",
             Environment::Production => "production",
+            Environment::Staging => "staging",
         }
     }
 }
@@ -172,8 +174,9 @@ impl TryFrom<String> for Environment {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
-            "local" => Ok(Environment::Local),
+            "dev" => Ok(Environment::Development),
             "production" => Ok(Environment::Production),
+            "staging" => Ok(Environment::Staging),
             other => Err(format!("{} is not a valid environment", other)),
         }
     }

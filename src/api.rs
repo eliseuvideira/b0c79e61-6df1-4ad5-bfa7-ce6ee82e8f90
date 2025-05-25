@@ -28,7 +28,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
 use crate::{
-    config::Settings,
+    config::Config,
     db,
     error::Error,
     models::job::{Job, JobStatus},
@@ -43,7 +43,7 @@ pub struct Api {
 
 impl Api {
     pub async fn build(
-        configuration: &Settings,
+        configuration: &Config,
         db_pool: Pool<Postgres>,
         rabbitmq_connection: Arc<Connection>,
         integration_queues: HashMap<String, String>,

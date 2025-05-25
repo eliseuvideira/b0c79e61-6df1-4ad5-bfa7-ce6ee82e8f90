@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anyhow::{Context, Result};
 use integrations_api::{
     app::Application,
-    config::{DatabaseSettings, Settings},
+    config::{DatabaseConfig, Config},
     services::rabbitmq,
 };
 use lapin::Channel;
@@ -38,7 +38,7 @@ pub async fn spawn_app() -> Result<TestApp> {
         .collect();
     let queue_consumer = Uuid::new_v4().to_string();
     let configuration = {
-        let mut configuration = Settings::build()?;
+        let mut configuration = Config::build()?;
         configuration.database.database_name = Uuid::new_v4().to_string();
         configuration.application.host = "127.0.0.1".to_string();
         configuration.application.port = 0;
@@ -73,7 +73,7 @@ pub async fn spawn_app() -> Result<TestApp> {
     })
 }
 
-async fn configure_database(config: &DatabaseSettings) -> Result<PgPool> {
+async fn configure_database(config: &DatabaseConfig) -> Result<PgPool> {
     let mut connection = PgConnection::connect_with(&config.connect_options_root())
         .await
         .context("Failed to connect to Postgres.")?;

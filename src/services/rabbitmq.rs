@@ -12,10 +12,10 @@ use serde::Serialize;
 use tracing::{debug_span, instrument, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::config::RabbitMQSettings;
+use crate::config::RabbitMQConfig;
 
 #[instrument(name = "rabbitmq_connect", skip_all)]
-pub async fn connect(settings: &RabbitMQSettings) -> Result<Connection> {
+pub async fn connect(settings: &RabbitMQConfig) -> Result<Connection> {
     let connection = Connection::connect(
         &settings.url,
         ConnectionProperties::default()

@@ -7,7 +7,7 @@ use tokio::try_join;
 
 use crate::{
     api::Api,
-    config::{DatabaseSettings, Settings},
+    config::{DatabaseConfig, Config},
     services::{minio, rabbitmq},
     worker::Worker,
 };
@@ -18,7 +18,7 @@ pub struct Application {
 }
 
 impl Application {
-    pub async fn build(configuration: Settings, metrics_handle: PrometheusHandle) -> Result<Self> {
+    pub async fn build(configuration: Config, metrics_handle: PrometheusHandle) -> Result<Self> {
         let db_pool = get_db_pool(&configuration.database);
 
         let rabbitmq_connection = rabbitmq::connect(&configuration.rabbitmq).await?;
@@ -82,6 +82,6 @@ impl Application {
     }
 }
 
-pub fn get_db_pool(settings: &DatabaseSettings) -> Pool<Postgres> {
+pub fn get_db_pool(settings: &DatabaseConfig) -> Pool<Postgres> {
     PgPoolOptions::new().connect_lazy_with(settings.connect_options())
 }
