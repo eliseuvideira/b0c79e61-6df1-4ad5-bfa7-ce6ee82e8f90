@@ -25,13 +25,14 @@ use metrics_exporter_prometheus::PrometheusHandle;
 use opentelemetry::{
     global::{self},
     propagation::Extractor,
+    trace::TraceContextExt,
 };
 use scalar_doc::Documentation;
 use serde::{Deserialize, Serialize};
 use sqlx::{postgres::PgPoolOptions, types::chrono::Utc, Pool, Postgres};
 use tokio::{net::TcpListener, try_join};
 use tower_http::trace::TraceLayer;
-use tracing::{debug_span, info_span, instrument, Instrument};
+use tracing::{info, info_span, instrument, Instrument, Span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
@@ -220,14 +221,15 @@ async fn not_found() -> StatusCode {
 }
 
 async fn attach_trace_id(req: Request, next: Next) -> Response {
-    let trace_id = find_current_trace_id();
+    let span = Span::current();
+    let context = span.context();
+    let otel_context = context.span().span_context().clone();
+    if otel_context.is_valid() {
+        let trace_id = otel_context.trace_id().to_string();
+        span.record("trace_id", trace_id);
+    }
 
-    next.run(req)
-        .instrument(debug_span!(
-            "trace_id",
-            trace_id = ?trace_id,
-        ))
-        .await
+    next.run(req).await
 }
 
 #[derive(Debug, Deserialize)]

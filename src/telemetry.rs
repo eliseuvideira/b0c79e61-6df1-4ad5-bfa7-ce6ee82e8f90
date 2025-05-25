@@ -81,13 +81,11 @@ fn build_logger_text_layer<S>() -> Box<dyn Layer<S> + Send + Sync + 'static>
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
 {
-    use tracing_subscriber::fmt::format::FmtSpan;
     Box::new(
         tracing_subscriber::fmt::layer()
             .pretty()
             .with_line_number(true)
             .with_thread_names(true)
-            .with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
             .with_timer(tracing_subscriber::fmt::time::uptime())
             .with_target(true)
             .with_level(true)
@@ -151,9 +149,9 @@ where
 
     init_propagator();
 
-    let layer = tracing_opentelemetry::layer()
-        .with_error_records_to_exceptions(true)
-        .with_tracer(tracer_provider.tracer(""));
+    let layer = tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer(
+        std::env::var("CARGO_PKG_NAME").unwrap_or_else(|_| "integrations_api".to_string()),
+    ));
     global::set_tracer_provider(tracer_provider.clone());
     Ok((layer, tracer_provider))
 }
