@@ -1,6 +1,11 @@
-use serde::Serialize;
+use std::{collections::HashMap, sync::Arc};
 
-use crate::types::Cursor;
+use lapin::Connection;
+use serde::{Deserialize, Serialize};
+use sqlx::{Pool, Postgres};
+use uuid::Uuid;
+
+use crate::{db, types::Cursor};
 
 #[derive(Debug, Serialize)]
 pub struct ApiResponsePagination<T> {
@@ -43,4 +48,42 @@ where
     pub fn new(data: T) -> Self {
         Self { data }
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PaginationQuery {
+    pub limit: Option<u64>,
+    pub cursor: Option<Uuid>,
+    #[serde(default)]
+    pub order: Order,
+}
+
+#[derive(Debug, Deserialize)]
+pub enum Order {
+    #[serde(rename = "asc")]
+    Asc,
+    #[serde(rename = "desc")]
+    Desc,
+}
+
+impl Default for Order {
+    fn default() -> Self {
+        Self::Desc
+    }
+}
+
+impl From<Order> for db::Order {
+    fn from(order: Order) -> Self {
+        match order {
+            Order::Asc => db::Order::Asc,
+            Order::Desc => db::Order::Desc,
+        }
+    }
+}
+
+pub struct AppState {
+    pub db_pool: Pool<Postgres>,
+    pub rabbitmq_connection: Arc<Connection>,
+    pub integration_queues: HashMap<String, String>,
+    pub exchange_name: String,
 }

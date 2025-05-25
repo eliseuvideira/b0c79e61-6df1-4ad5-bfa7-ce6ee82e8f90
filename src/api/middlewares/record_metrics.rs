@@ -10,7 +10,8 @@ use tokio::time::Instant;
 
 use crate::telemetry::Metrics;
 
-fn get_method(method: &Method) -> &'static str {
+fn get_method(req: &Request) -> &'static str {
+    let method = req.method();
     match *method {
         Method::OPTIONS => "OPTIONS",
         Method::GET => "GET",
@@ -25,7 +26,7 @@ fn get_method(method: &Method) -> &'static str {
     }
 }
 
-fn get_labels(req: &Request) -> (&'static str, String) {
+fn get_endpoint(req: &Request) -> String {
     let exact_endpoint = req.uri().path().to_string();
     let endpoint = req
         .extensions()
@@ -33,9 +34,8 @@ fn get_labels(req: &Request) -> (&'static str, String) {
         .map_or(exact_endpoint, |matched_path| {
             matched_path.as_str().to_string()
         });
-    let method = get_method(req.method());
 
-    (method, endpoint)
+    endpoint
 }
 
 pub async fn record_metrics(
@@ -43,7 +43,8 @@ pub async fn record_metrics(
     req: Request,
     next: Next,
 ) -> Response {
-    let (method, endpoint) = get_labels(&req);
+    let method = get_method(&req);
+    let endpoint = get_endpoint(&req);
 
     metrics.http_requests_pending(method, &endpoint).inc();
 
