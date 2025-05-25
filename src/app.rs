@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{postgres::PgPoolOptions, types::chrono::Utc, Pool, Postgres};
 use tokio::{net::TcpListener, try_join};
 use tower_http::trace::TraceLayer;
-use tracing::{info, info_span, instrument, Instrument, Span};
+use tracing::{info_span, instrument, Instrument, Span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
@@ -76,7 +76,7 @@ impl Application {
         for queue in configuration.rabbitmq.queues.iter() {
             rabbitmq::declare_and_bind_queue(
                 &channel,
-                &queue,
+                queue,
                 &configuration.rabbitmq.exchange_name,
             )
             .await?;
