@@ -40,12 +40,11 @@ use crate::{
     config::{DatabaseSettings, Settings},
     db,
     error::Error,
-    minio,
     models::{
         package::Package,
         scrapper_job::{ScrapperJob, ScrapperJobStatus},
     },
-    rabbitmq,
+    services::{minio, rabbitmq},
 };
 
 pub struct Application {
@@ -90,7 +89,7 @@ impl Application {
 
         let queue_consumer = configuration.rabbitmq.queue_consumer;
 
-        let minio_client = minio::create_minio_client(&configuration.minio).await?;
+        let minio_client = minio::create_client(&configuration.minio).await?;
 
         let address = format!(
             "{}:{}",

@@ -3,7 +3,6 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod metrics;
-pub mod minio;
 pub mod models;
-pub mod rabbitmq;
+pub mod services;
 pub mod telemetry;

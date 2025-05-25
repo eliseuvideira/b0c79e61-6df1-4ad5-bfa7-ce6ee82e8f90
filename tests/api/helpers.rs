@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use integrations_api::{
     app::Application,
     config::{DatabaseSettings, Settings},
-    rabbitmq,
+    services::rabbitmq,
 };
 use lapin::Channel;
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle, PrometheusRecorder};
