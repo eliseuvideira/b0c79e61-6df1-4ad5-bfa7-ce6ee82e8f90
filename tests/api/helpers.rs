@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anyhow::{Context, Result};
 use integrations_api::{
     app::Application,
-    config::{DatabaseConfig, Config},
+    config::{Config, DatabaseConfig},
     services::rabbitmq,
 };
 use lapin::Channel;

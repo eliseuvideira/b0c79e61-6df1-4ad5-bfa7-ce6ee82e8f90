@@ -7,7 +7,7 @@ use tokio::try_join;
 
 use crate::{
     api::Api,
-    config::{DatabaseConfig, Config},
+    config::{Config, DatabaseConfig},
     services::{minio, rabbitmq},
     worker::Worker,
 };
