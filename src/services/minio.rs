@@ -1,19 +1,13 @@
 use anyhow::Result;
 use aws_config::{BehaviorVersion, Region};
-use aws_sdk_s3::{config::Credentials, Client};
+use aws_sdk_s3::Client;
 use tracing::instrument;
 
 use crate::config::MinioSettings;
 
 #[instrument(name = "create_client", skip_all)]
 pub async fn create_client(settings: &MinioSettings) -> Result<Client> {
-    let credentials = Credentials::new(
-        settings.username.clone(),
-        settings.password.clone(),
-        None,
-        None,
-        "minio0",
-    );
+    let credentials = settings.credentials();
 
     let config = aws_config::defaults(BehaviorVersion::latest())
         .credentials_provider(credentials)

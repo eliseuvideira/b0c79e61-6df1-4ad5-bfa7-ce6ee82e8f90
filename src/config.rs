@@ -1,4 +1,6 @@
 use anyhow::{Context, Result};
+use aws_sdk_s3::config::Credentials;
+use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use serde_aux::prelude::*;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
@@ -24,8 +26,8 @@ pub struct DatabaseSettings {
     pub host: String,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
-    pub username: String,
-    pub password: String,
+    pub username: SecretString,
+    pub password: SecretString,
     pub database_name: String,
     pub require_ssl: bool,
 }
@@ -42,8 +44,20 @@ pub struct RabbitMQSettings {
 #[derive(Deserialize)]
 pub struct MinioSettings {
     pub url: String,
-    pub username: String,
-    pub password: String,
+    pub username: SecretString,
+    pub password: SecretString,
+}
+
+impl MinioSettings {
+    pub fn credentials(&self) -> Credentials {
+        Credentials::new(
+            self.username.expose_secret(),
+            self.password.expose_secret(),
+            None,
+            None,
+            "minio0",
+        )
+    }
 }
 
 impl DatabaseSettings {
@@ -57,8 +71,8 @@ impl DatabaseSettings {
         PgConnectOptions::new()
             .host(&self.host)
             .port(self.port)
-            .username(&self.username)
-            .password(&self.password)
+            .username(self.username.expose_secret())
+            .password(self.password.expose_secret())
             .database(&self.database_name)
             .ssl_mode(ssl_mode)
     }
@@ -67,8 +81,8 @@ impl DatabaseSettings {
         PgConnectOptions::new()
             .host(&self.host)
             .port(self.port)
-            .username(&self.username)
-            .password(&self.password)
+            .username(self.username.expose_secret())
+            .password(self.password.expose_secret())
     }
 }
 
