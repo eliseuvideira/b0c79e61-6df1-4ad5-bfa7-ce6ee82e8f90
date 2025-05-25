@@ -4,6 +4,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::types::Cursor;
+
 #[derive(Debug, Deserialize, Serialize)]
 pub enum JobStatus {
     #[serde(rename = "processing")]
@@ -42,4 +44,10 @@ pub struct Job {
     pub status: JobStatus,
     pub trace_id: Option<String>,
     pub created_at: DateTime<Utc>,
+}
+
+impl Cursor for Job {
+    fn cursor(&self) -> String {
+        self.id.to_string()
+    }
 }

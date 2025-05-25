@@ -6,3 +6,7 @@ pub struct JobMessage {
     pub job_id: Uuid,
     pub package_name: String,
 }
+
+pub trait Cursor {
+    fn cursor(&self) -> String;
+}

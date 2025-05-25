@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::{Context, Result};
 use axum::{
     extract::{Query, Request, State},
-    middleware::{from_fn, Next},
+    middleware::{from_fn, from_fn_with_state, Next},
     response::{Html, IntoResponse, Response},
     routing::{get, post},
     serve::Serve,
@@ -15,16 +15,17 @@ use axum_tracing_opentelemetry::{
 };
 use chrono::Utc;
 use lapin::Connection;
-use metrics_exporter_prometheus::PrometheusHandle;
 use opentelemetry::trace::TraceContextExt;
+use prometheus::{Encoder, TextEncoder};
 use reqwest::StatusCode;
 use scalar_doc::Documentation;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sqlx::{Pool, Postgres};
 use tokio::net::TcpListener;
 use tower_http::trace::TraceLayer;
 use tracing::{instrument, Span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+use types::{ApiResponse, ApiResponsePagination};
 use uuid::Uuid;
 
 use crate::{
@@ -33,8 +34,12 @@ use crate::{
     error::Error,
     models::job::{Job, JobStatus},
     services::rabbitmq,
+    telemetry::Metrics,
     types::JobMessage,
 };
+
+mod middlewares;
+mod types;
 
 pub struct Api {
     port: u16,
@@ -47,7 +52,7 @@ impl Api {
         db_pool: Pool<Postgres>,
         rabbitmq_connection: Arc<Connection>,
         integration_queues: HashMap<String, String>,
-        metrics_handle: PrometheusHandle,
+        metrics: Arc<Metrics>,
     ) -> Result<Self> {
         let address = format!(
             "{}:{}",
@@ -68,10 +73,9 @@ impl Api {
             exchange_name: configuration.rabbitmq.exchange_name.clone(),
         });
 
-        let prometheus_layer = axum_prometheus::PrometheusMetricLayer::default();
-
-        let metrics_router =
-            Router::new().route("/metrics", get(|| async move { metrics_handle.render() }));
+        let metrics_router = Router::new()
+            .route("/metrics", get(metrics_handler))
+            .with_state(metrics.clone());
 
         let router = Router::new()
             .route("/jobs", post(create_job))
@@ -80,9 +84,12 @@ impl Api {
             .route("/openapi", get(openapi))
             .layer(TraceLayer::new_for_http())
             .layer(from_fn(attach_trace_id))
+            .layer(from_fn_with_state(
+                metrics.clone(),
+                middlewares::record_metrics,
+            ))
             .layer(OtelInResponseLayer)
             .layer(OtelAxumLayer::default())
-            .layer(prometheus_layer)
             .with_state(app_state)
             .merge(metrics_router)
             .route("/health", get(health_check))
@@ -111,13 +118,13 @@ async fn index() -> impl IntoResponse {
 }
 
 async fn openapi() -> &'static str {
-    include_str!("../openapi.json")
+    include_str!("../../openapi.json")
 }
 
 #[derive(Debug, Deserialize)]
 struct PaginationQuery {
     limit: Option<u64>,
-    after: Option<Uuid>,
+    cursor: Option<Uuid>,
     #[serde(default)]
     order: Order,
 }
@@ -145,38 +152,18 @@ impl From<Order> for db::Order {
     }
 }
 
-#[derive(Debug, Serialize)]
-struct WithPagination<T> {
-    data: Vec<T>,
-    has_more: bool,
-}
-
 async fn get_jobs(
     Query(query): Query<PaginationQuery>,
     State(app_state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, Error> {
     let limit = query.limit.unwrap_or(100);
-    let after = query.after;
+    let cursor = query.cursor;
     let order = query.order.into();
 
     let mut conn = app_state.db_pool.acquire().await?;
-    let jobs = db::get_jobs(&mut conn, limit, after, order).await?;
+    let jobs = db::get_jobs(&mut conn, limit, cursor, order).await?;
 
-    Ok(Json(paginate(jobs, limit)))
-}
-
-fn paginate<T>(items: Vec<T>, limit: u64) -> WithPagination<T>
-where
-    T: Serialize,
-{
-    let has_more = items.len() > limit as usize;
-    let data = if has_more {
-        items.into_iter().take(limit as usize).collect()
-    } else {
-        items
-    };
-
-    WithPagination { data, has_more }
+    Ok(Json(ApiResponsePagination::new(jobs, limit)))
 }
 
 struct AppState {
@@ -253,5 +240,13 @@ async fn create_job(
 
     rabbitmq::publish_message(&channel, &app_state.exchange_name, &routing_key, &message).await?;
 
-    Ok((StatusCode::CREATED, Json(job)))
+    Ok((StatusCode::CREATED, Json(ApiResponse::new(job))))
+}
+
+async fn metrics_handler(State(metrics): State<Arc<Metrics>>) -> impl IntoResponse {
+    let metrics = metrics.registry.gather();
+    let encoder = TextEncoder::new();
+    let mut buffer = Vec::new();
+    encoder.encode(&metrics, &mut buffer).unwrap();
+    String::from_utf8(buffer).unwrap()
 }

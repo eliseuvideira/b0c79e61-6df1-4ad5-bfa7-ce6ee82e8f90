@@ -1,7 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
-use metrics_exporter_prometheus::PrometheusHandle;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use tokio::try_join;
 
@@ -9,6 +8,7 @@ use crate::{
     api::Api,
     config::{Config, DatabaseConfig},
     services::{minio, rabbitmq},
+    telemetry::Metrics,
     worker::Worker,
 };
 
@@ -18,7 +18,7 @@ pub struct Application {
 }
 
 impl Application {
-    pub async fn build(configuration: Config, metrics_handle: PrometheusHandle) -> Result<Self> {
+    pub async fn build(configuration: Config, metrics: Metrics) -> Result<Self> {
         let db_pool = get_db_pool(&configuration.database);
 
         let rabbitmq_connection = Arc::new(rabbitmq::connect(&configuration.rabbitmq).await?);
@@ -59,12 +59,14 @@ impl Application {
         )
         .await?;
 
+        let metrics = Arc::new(metrics);
+
         let api = Api::build(
             &configuration,
             db_pool,
             rabbitmq_connection.clone(),
             integration_queues,
-            metrics_handle,
+            metrics,
         )
         .await?;
 

@@ -5,9 +5,9 @@ use integrations_api::{
     app::Application,
     config::{Config, DatabaseConfig},
     services::rabbitmq,
+    telemetry::Metrics,
 };
 use lapin::Channel;
-use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle, PrometheusRecorder};
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 
@@ -16,14 +16,6 @@ pub struct TestApp {
     pub db_pool: PgPool,
     pub channel: Channel,
     pub integration_queues: HashMap<String, String>,
-}
-
-pub fn init_metrics() -> (PrometheusHandle, PrometheusRecorder) {
-    let builder = PrometheusBuilder::new();
-    let recorder = builder.build_recorder();
-    let handle = recorder.handle();
-
-    (handle, recorder)
 }
 
 pub async fn spawn_app() -> Result<TestApp> {
@@ -51,14 +43,13 @@ pub async fn spawn_app() -> Result<TestApp> {
 
     let db_pool = configure_database(&configuration.database).await?;
 
-    let (metrics_handle, _) = init_metrics();
-
     let rabbitmq_connection = rabbitmq::connect(&configuration.rabbitmq).await?;
     let channel = rabbitmq_connection.create_channel().await?;
 
     let integration_queues: HashMap<String, String> = registry_queues.into_iter().collect();
 
-    let application = Application::build(configuration, metrics_handle)
+    let metrics = Metrics::build()?;
+    let application = Application::build(configuration, metrics)
         .await
         .context("Failed to build application.")?;
     let port = application.api.port();

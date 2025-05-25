@@ -92,9 +92,9 @@ async fn test_create_job_returns_job_object() -> Result<()> {
     assert_eq!(response.status(), StatusCode::CREATED);
 
     let body = response.json::<serde_json::Value>().await?;
-    assert_eq!(body["id"].is_string(), true);
-    assert_eq!(body["registry_name"], *registry_name);
-    assert_eq!(body["package_name"], "serde");
+    assert_eq!(body["data"]["id"].is_string(), true);
+    assert_eq!(body["data"]["registry_name"], *registry_name);
+    assert_eq!(body["data"]["package_name"], "serde");
 
     Ok(())
 }
@@ -164,7 +164,7 @@ async fn test_get_jobs_returns_paginated_jobs() -> Result<()> {
 
     // Assert
     assert_eq!(body.get("data").is_some(), true);
-    assert_eq!(body["has_more"], false);
+    assert!(body["next_cursor"].is_null());
 
     Ok(())
 }
@@ -196,7 +196,7 @@ async fn test_get_jobs_returns_paginated_jobs_with_limit_for_asc_order() -> Resu
 
         let body: serde_json::Value = response.json().await?;
         job_ids.push(
-            body["id"]
+            body["data"]["id"]
                 .as_str()
                 .ok_or(anyhow::anyhow!("Job ID is not a string"))?
                 .to_string(),
@@ -216,7 +216,7 @@ async fn test_get_jobs_returns_paginated_jobs_with_limit_for_asc_order() -> Resu
     assert_eq!(body["data"][1]["id"], job_ids[1]);
     assert_eq!(body["data"][2]["id"], job_ids[2]);
     assert_eq!(body["data"][3]["id"], job_ids[3]);
-    assert_eq!(body["has_more"], true);
+    assert_eq!(body["next_cursor"], job_ids[4]);
 
     Ok(())
 }
@@ -248,7 +248,7 @@ async fn test_get_jobs_returns_paginated_jobs_with_limit_for_desc_order() -> Res
 
         let body: serde_json::Value = response.json().await?;
         job_ids.push(
-            body["id"]
+            body["data"]["id"]
                 .as_str()
                 .ok_or(anyhow::anyhow!("Job ID is not a string"))?
                 .to_string(),
@@ -268,7 +268,72 @@ async fn test_get_jobs_returns_paginated_jobs_with_limit_for_desc_order() -> Res
     assert_eq!(body["data"][1]["id"], job_ids[3]);
     assert_eq!(body["data"][2]["id"], job_ids[2]);
     assert_eq!(body["data"][3]["id"], job_ids[1]);
-    assert_eq!(body["has_more"], true);
+    assert_eq!(body["next_cursor"], job_ids[0]);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_jobs_paginates_properly() -> Result<()> {
+    // Arrange
+    let app = spawn_app().await?;
+    let client = reqwest::Client::new();
+
+    let (registry_name, _) = app
+        .integration_queues
+        .iter()
+        .next()
+        .expect("No registry name");
+
+    let mut job_ids = Vec::new();
+
+    for _ in 0..10 {
+        let package_name: String = fake::faker::name::en::Name().fake();
+        let response = client
+            .post(format!("{}/jobs", app.address))
+            .json(&json!({
+                "registry_name": registry_name,
+                "package_name": package_name,
+            }))
+            .send()
+            .await?;
+
+        let body: serde_json::Value = response.json().await?;
+        job_ids.push(
+            body["data"]["id"]
+                .as_str()
+                .ok_or(anyhow::anyhow!("Job ID is not a string"))?
+                .to_string(),
+        );
+    }
+
+    // Act
+    let response = client
+        .get(format!("{}/jobs?limit=5&order=desc", app.address))
+        .send()
+        .await?;
+
+    // Assert
+    let body: serde_json::Value = response.json().await?;
+    assert_eq!(body.get("data").is_some(), true);
+    assert_eq!(body["next_cursor"], job_ids[4]);
+
+    // Act
+    let response = client
+        .get(format!(
+            "{}/jobs?limit=5&order=desc&cursor={}",
+            app.address, job_ids[4]
+        ))
+        .send()
+        .await?;
+    let body: serde_json::Value = response.json().await?;
+    assert_eq!(body.get("data").is_some(), true);
+    assert_eq!(body["data"][0]["id"], job_ids[4]);
+    assert_eq!(body["data"][1]["id"], job_ids[3]);
+    assert_eq!(body["data"][2]["id"], job_ids[2]);
+    assert_eq!(body["data"][3]["id"], job_ids[1]);
+    assert_eq!(body["data"][4]["id"], job_ids[0]);
+    assert!(body["next_cursor"].is_null());
 
     Ok(())
 }
