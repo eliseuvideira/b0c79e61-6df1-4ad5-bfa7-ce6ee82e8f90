@@ -15,8 +15,8 @@ use axum_tracing_opentelemetry::{
     middleware::{OtelAxumLayer, OtelInResponseLayer},
     tracing_opentelemetry_instrumentation_sdk::find_current_trace_id,
 };
-use futures_lite::stream::StreamExt;
 use lapin::{
+    message::DeliveryResult,
     options::{BasicAckOptions, BasicNackOptions},
     types::{AMQPValue, FieldTable, ShortString},
     Connection,
@@ -171,38 +171,46 @@ impl Application {
         consumer_queue: String,
     ) -> Result<()> {
         let channel = rabbitmq_connection.create_channel().await?;
-        let mut consumer = rabbitmq::create_consumer(&channel, &consumer_queue).await?;
+        let consumer = rabbitmq::create_consumer(&channel, &consumer_queue).await?;
 
-        while let Some(Ok(delivery)) = consumer.next().await {
-            let message = serde_json::from_slice::<ScrapperJobMessage>(&delivery.data)?;
-            let span = if let Some(headers) = delivery.properties.headers() {
-                let extractor = FieldTableExtractor(headers);
-                let context = global::get_text_map_propagator(|prop| prop.extract(&extractor));
+        consumer.set_delegate(move |delivery: DeliveryResult| {
+            let minio_client_for_task = minio_client.clone();
+            let db_pool_for_task = db_pool.clone();
 
-                let span = info_span!("consumer");
-                span.set_parent(context);
-                span
-            } else {
-                info_span!("consumer")
-            };
-            let _ = span.enter();
-
-            match consume_message(message, minio_client.clone(), db_pool.clone())
-                .instrument(span)
-                .await
-            {
-                Ok(_) => delivery.ack(BasicAckOptions::default()).await?,
-                Err(err) => {
-                    tracing::error!("Failed to process message: {:?}", err);
-                    delivery
-                        .nack(BasicNackOptions {
-                            multiple: false,
-                            requeue: false,
-                        })
-                        .await?;
+            async move {
+                match delivery {
+                    Ok(Some(delivery)) => {
+                        match parse_and_run_consume(
+                            &delivery.data,
+                            delivery.properties.headers(),
+                            minio_client_for_task,
+                            db_pool_for_task,
+                        )
+                        .await
+                        {
+                            Ok(_) => delivery
+                                .ack(BasicAckOptions::default())
+                                .await
+                                .expect("Failed to ack message"),
+                            Err(err) => {
+                                tracing::error!("Failed to process message: {:?}", err);
+                                delivery
+                                    .nack(BasicNackOptions {
+                                        multiple: false,
+                                        requeue: false,
+                                    })
+                                    .await
+                                    .expect("Failed to nack message");
+                            }
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        tracing::error!("Failed to consume queue message {}:", error);
+                    }
                 }
             }
-        }
+        });
 
         Ok(())
     }
@@ -359,4 +367,28 @@ async fn index() -> impl IntoResponse {
 
 async fn openapi() -> &'static str {
     include_str!("../openapi.json")
+}
+
+async fn parse_and_run_consume(
+    data: &[u8],
+    headers: &Option<FieldTable>,
+    minio_client: MinioClient,
+    db_pool: Pool<Postgres>,
+) -> Result<()> {
+    let message = serde_json::from_slice::<ScrapperJobMessage>(data)?;
+    let span = if let Some(headers) = headers {
+        let extractor = FieldTableExtractor(headers);
+        let context = global::get_text_map_propagator(|prop| prop.extract(&extractor));
+
+        let span = info_span!("consumer");
+        span.set_parent(context);
+        span
+    } else {
+        info_span!("consumer")
+    };
+    let _ = span.enter();
+
+    consume_message(message, minio_client, db_pool)
+        .instrument(span)
+        .await
 }

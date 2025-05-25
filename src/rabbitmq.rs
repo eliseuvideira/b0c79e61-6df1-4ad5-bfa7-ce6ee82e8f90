@@ -16,7 +16,13 @@ use crate::config::RabbitMQSettings;
 
 #[instrument(name = "rabbitmq_connect", skip_all)]
 pub async fn connect(settings: &RabbitMQSettings) -> Result<Connection> {
-    let connection = Connection::connect(&settings.url, ConnectionProperties::default()).await?;
+    let connection = Connection::connect(
+        &settings.url,
+        ConnectionProperties::default()
+            .with_executor(tokio_executor_trait::Tokio::current())
+            .with_reactor(tokio_reactor_trait::Tokio),
+    )
+    .await?;
 
     Ok(connection)
 }
