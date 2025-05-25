@@ -61,7 +61,7 @@ pub async fn spawn_app() -> Result<TestApp> {
     let application = Application::build(configuration, metrics_handle)
         .await
         .context("Failed to build application.")?;
-    let port = application.port();
+    let port = application.api.port();
     let address = format!("http://127.0.0.1:{}", port);
     let _ = tokio::spawn(application.run_until_stopped());
 
