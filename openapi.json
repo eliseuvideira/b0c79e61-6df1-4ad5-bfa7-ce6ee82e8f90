@@ -33,9 +33,9 @@
             }
           },
           {
-            "name": "after",
+            "name": "cursor",
             "in": "query",
-            "description": "Get jobs after a specific job ID",
+            "description": "Cursor for pagination to fetch jobs after a specific job ID",
             "required": false,
             "schema": {
               "type": "string",
@@ -76,7 +76,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JobResponse"
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/JobResponse"
+                    }
+                  }
                 }
               }
             }
@@ -99,9 +104,9 @@
               "$ref": "#/components/schemas/JobResponse"
             }
           },
-          "has_more": {
-            "type": "boolean",
-            "description": "Whether there are more jobs to fetch"
+          "next_cursor": {
+            "type": ["string", "null"],
+            "description": "Cursor for pagination to fetch the next page of results"
           }
         }
       },
