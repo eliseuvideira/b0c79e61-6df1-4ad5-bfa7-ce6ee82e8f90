@@ -119,12 +119,6 @@ pub async fn publish_message<T: Serialize>(
         );
     });
 
-    let span = debug_span!(
-        "rabbitmq_publish",
-        exchange = %exchange,
-        routing_key = %routing_key,
-    );
-
     channel
         .basic_publish(
             exchange,
@@ -136,7 +130,11 @@ pub async fn publish_message<T: Serialize>(
                 .with_headers(headers)
                 .with_content_type("application/json".into()),
         )
-        .instrument(span)
+        .instrument(debug_span!(
+            "rabbitmq_publish",
+            exchange = %exchange,
+            routing_key = %routing_key,
+        ))
         .await?;
 
     Ok(())

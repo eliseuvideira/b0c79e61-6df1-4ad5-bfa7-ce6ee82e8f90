@@ -1,6 +1,8 @@
 use anyhow::Result;
 use integrations_api::{
-    app::Application, config::Config, metrics::init_metrics, telemetry::init_subscribers,
+    app::Application,
+    config::Config,
+    telemetry::{init_metrics, init_subscribers},
 };
 
 #[tokio::main]
@@ -8,7 +10,6 @@ async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
 
     let _guard = init_subscribers()?;
-
     let metrics_handle = init_metrics();
 
     let configuration = Config::build()?;

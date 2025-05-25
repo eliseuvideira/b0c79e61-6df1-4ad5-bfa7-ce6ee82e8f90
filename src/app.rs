@@ -21,8 +21,7 @@ impl Application {
     pub async fn build(configuration: Config, metrics_handle: PrometheusHandle) -> Result<Self> {
         let db_pool = get_db_pool(&configuration.database);
 
-        let rabbitmq_connection = rabbitmq::connect(&configuration.rabbitmq).await?;
-        let rabbitmq_connection = Arc::new(rabbitmq_connection);
+        let rabbitmq_connection = Arc::new(rabbitmq::connect(&configuration.rabbitmq).await?);
         let channel = rabbitmq_connection.create_channel().await?;
 
         rabbitmq::declare_exchange(&channel, &configuration.rabbitmq.exchange_name).await?;
@@ -63,7 +62,7 @@ impl Application {
         let api = Api::build(
             &configuration,
             db_pool,
-            rabbitmq_connection,
+            rabbitmq_connection.clone(),
             integration_queues,
             metrics_handle,
         )

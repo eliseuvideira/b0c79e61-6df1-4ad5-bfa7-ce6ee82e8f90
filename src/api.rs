@@ -62,13 +62,16 @@ impl Api {
             .port();
 
         let app_state = Arc::new(AppState {
-            db: db_pool.clone(),
-            rabbitmq_connection: rabbitmq_connection.clone(),
+            db_pool: db_pool.clone(),
+            rabbitmq_connection,
             integration_queues,
             exchange_name: configuration.rabbitmq.exchange_name.clone(),
         });
 
         let prometheus_layer = axum_prometheus::PrometheusMetricLayer::default();
+
+        let metrics_router =
+            Router::new().route("/metrics", get(|| async move { metrics_handle.render() }));
 
         let router = Router::new()
             .route("/jobs", post(create_job))
@@ -81,10 +84,7 @@ impl Api {
             .layer(OtelAxumLayer::default())
             .layer(prometheus_layer)
             .with_state(app_state)
-            .route(
-                "/metrics",
-                get(move || std::future::ready(metrics_handle.render())),
-            )
+            .merge(metrics_router)
             .route("/health", get(health_check))
             .fallback(not_found);
 
@@ -159,7 +159,7 @@ async fn get_jobs(
     let after = query.after;
     let order = query.order.into();
 
-    let mut conn = app_state.db.acquire().await?;
+    let mut conn = app_state.db_pool.acquire().await?;
     let jobs = db::get_jobs(&mut conn, limit, after, order).await?;
 
     Ok(Json(paginate(jobs, limit)))
@@ -180,7 +180,7 @@ where
 }
 
 struct AppState {
-    db: Pool<Postgres>,
+    db_pool: Pool<Postgres>,
     rabbitmq_connection: Arc<Connection>,
     integration_queues: HashMap<String, String>,
     exchange_name: String,
@@ -222,7 +222,7 @@ async fn create_job(
     let package_name = payload.package_name;
     let trace_id = find_current_trace_id();
 
-    let mut transaction = app_state.db.begin().await?;
+    let mut transaction = app_state.db_pool.begin().await?;
 
     let routing_key = app_state
         .integration_queues
