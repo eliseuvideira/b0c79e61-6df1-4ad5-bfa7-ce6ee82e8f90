@@ -92,7 +92,7 @@ impl Config {
         let configuration_directory = base_path.join("configs");
 
         let environment: Environment = std::env::var("APP_ENVIRONMENT")
-            .unwrap_or_else(|_| "local".into())
+            .unwrap_or_else(|_| "dev".into())
             .try_into()
             .expect("Failed to parse APP_ENVIRONMENT");
         let environment_filename = format!("{}.toml", environment.as_str());

@@ -101,7 +101,7 @@ fn build_loki_layer() -> Result<(tracing_loki::Layer, BackgroundTask)> {
         .label("version", env!("CARGO_PKG_VERSION"))?
         .label(
             "environment",
-            std::env::var("APP_ENVIRONMENT").unwrap_or_else(|_| "local".to_string()),
+            std::env::var("APP_ENVIRONMENT").unwrap_or_else(|_| "dev".to_string()),
         )?
         .build_url(Url::parse(
             &std::env::var("LOGGING_LOKI_URL")
