@@ -1,0 +1,58 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['prometheus:9090']
+        labels:
+          instance: prometheus
+
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']
+        labels:
+          instance: alertmanager
+
+  - job_name: 'loki'
+    static_configs:
+      - targets: ['loki:3100']
+        labels:
+          instance: loki
+
+  - job_name: 'pushgateway'
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']
+        labels:
+          instance: pushgateway
+
+  - job_name: 'otel-collector'
+    honor_labels: true
+    static_configs:
+      - targets: ['otel-collector:8888']
+        labels:
+          instance: otel-collector
+
+  - job_name: 'grafana'
+    honor_labels: true
+    static_configs:
+      - targets: ['grafana:3000']
+        labels:
+          instance: grafana
+
+  - job_name: 'tempo'
+    honor_labels: true
+    static_configs:
+      - targets: ['tempo:3200']
+        labels:
+          instance: tempo
+
+rule_files:
+  - rules.yaml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
