@@ -20,7 +20,7 @@ use opentelemetry::trace::TraceContextExt;
 use reqwest::StatusCode;
 use scalar_doc::Documentation;
 use serde::{Deserialize, Serialize};
-use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
+use sqlx::{Pool, Postgres};
 use tokio::net::TcpListener;
 use tower_http::trace::TraceLayer;
 use tracing::{instrument, Span};
@@ -28,7 +28,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
 use crate::{
-    config::{DatabaseSettings, Settings},
+    config::Settings,
     db,
     error::Error,
     models::job::{Job, JobStatus},
@@ -136,11 +136,11 @@ impl Default for Order {
     }
 }
 
-impl Into<db::Order> for Order {
-    fn into(self) -> db::Order {
-        match self {
-            Self::Asc => db::Order::Asc,
-            Self::Desc => db::Order::Desc,
+impl From<Order> for db::Order {
+    fn from(order: Order) -> Self {
+        match order {
+            Order::Asc => db::Order::Asc,
+            Order::Desc => db::Order::Desc,
         }
     }
 }
@@ -160,7 +160,7 @@ async fn get_jobs(
     let order = query.order.into();
 
     let mut conn = app_state.db.acquire().await?;
-    let jobs = db::get_jobs(&mut *conn, limit, after, order).await?;
+    let jobs = db::get_jobs(&mut conn, limit, after, order).await?;
 
     Ok(Json(paginate(jobs, limit)))
 }
