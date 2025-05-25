@@ -6,16 +6,66 @@
     "version": "1.0.0"
   },
   "paths": {
-    "/scrapper-jobs": {
+    "/jobs": {
+      "get": {
+        "summary": "Get jobs",
+        "description": "Get jobs",
+        "tags": ["jobs"],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Limit the number of jobs to return",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "Order the jobs by",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"]
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Get jobs after a specific job ID",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedJobResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
-        "summary": "Create a new scrapper job",
-        "description": "Initiates a scrapper job for the specified package from the registry",
+        "summary": "Create a new job",
+        "description": "Initiates a job for the specified package from the registry",
+        "tags": ["jobs"],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScrapperJobRequest"
+                "$ref": "#/components/schemas/JobRequest"
               }
             }
           }
@@ -26,7 +76,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ScrapperJobResponse"
+                  "$ref": "#/components/schemas/JobResponse"
                 }
               }
             }
@@ -40,7 +90,22 @@
   },
   "components": {
     "schemas": {
-      "ScrapperJobRequest": {
+      "PaginatedJobResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobResponse"
+            }
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether there are more jobs to fetch"
+          }
+        }
+      },
+      "JobRequest": {
         "type": "object",
         "required": ["registry_name", "package_name"],
         "properties": {
@@ -55,7 +120,7 @@
           }
         }
       },
-      "ScrapperJobResponse": {
+      "JobResponse": {
         "type": "object",
         "properties": {
           "id": {

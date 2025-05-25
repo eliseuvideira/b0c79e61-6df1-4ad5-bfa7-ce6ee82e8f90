@@ -8,11 +8,10 @@ use crate::{
     telemetry::{instrument_query, Operation},
 };
 
+use super::types::Order;
+
 #[instrument(name = "insert_job", skip(conn))]
-pub async fn insert_job(
-    conn: &mut PgConnection,
-    job: Job,
-) -> Result<Job> {
+pub async fn insert_job(conn: &mut PgConnection, job: Job) -> Result<Job> {
     let result = sqlx::query_as!(
         Job,
         "INSERT INTO jobs (id, registry_name, package_name, status, trace_id, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;",
@@ -42,4 +41,86 @@ pub async fn complete_job(conn: &mut PgConnection, id: Uuid) -> Result<Job> {
     .await?;
 
     Ok(job)
+}
+
+#[instrument(name = "get_jobs", skip(conn))]
+pub async fn get_jobs(
+    conn: &mut PgConnection,
+    limit: u64,
+    after: Option<Uuid>,
+    order: Order,
+) -> Result<Vec<Job>> {
+    match after {
+        Some(after) => get_jobs_with_limit_after(conn, limit, after, order).await,
+        None => get_jobs_with_limit(conn, limit, order).await,
+    }
+}
+
+async fn get_jobs_with_limit(
+    conn: &mut PgConnection,
+    limit: u64,
+    order: Order,
+) -> Result<Vec<Job>> {
+    match order {
+        Order::Asc => {
+            let jobs = sqlx::query_as!(
+                Job,
+                "SELECT * FROM jobs ORDER BY id ASC LIMIT $1 + 1;",
+                limit as i64
+            )
+            .fetch_all(conn)
+            .instrument(instrument_query(Operation::Select, "jobs"))
+            .await?;
+
+            Ok(jobs)
+        }
+        Order::Desc => {
+            let jobs = sqlx::query_as!(
+                Job,
+                "SELECT * FROM jobs ORDER BY id DESC LIMIT $1 + 1;",
+                limit as i64
+            )
+            .fetch_all(conn)
+            .instrument(instrument_query(Operation::Select, "jobs"))
+            .await?;
+
+            Ok(jobs)
+        }
+    }
+}
+
+async fn get_jobs_with_limit_after(
+    conn: &mut PgConnection,
+    limit: u64,
+    after: Uuid,
+    order: Order,
+) -> Result<Vec<Job>> {
+    match order {
+        Order::Asc => {
+            let jobs = sqlx::query_as!(
+                Job,
+                "SELECT * FROM jobs WHERE id > $1 ORDER BY id ASC LIMIT $2 + 1;",
+                after,
+                limit as i64,
+            )
+            .fetch_all(conn)
+            .instrument(instrument_query(Operation::Select, "jobs"))
+            .await?;
+
+            Ok(jobs)
+        }
+        Order::Desc => {
+            let jobs = sqlx::query_as!(
+                Job,
+                "SELECT * FROM jobs WHERE id < $1 ORDER BY id DESC LIMIT $2 + 1;",
+                after,
+                limit as i64,
+            )
+            .fetch_all(conn)
+            .instrument(instrument_query(Operation::Select, "jobs"))
+            .await?;
+
+            Ok(jobs)
+        }
+    }
 }

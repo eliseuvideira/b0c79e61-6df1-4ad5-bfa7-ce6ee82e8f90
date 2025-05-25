@@ -1149,6 +1149,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "claims"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bba18ee93d577a8428902687bcc2b6b45a56b1981a1f6d779731c86cc4c5db18"
+
+[[package]]
 name = "clang-sys"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1633,6 +1639,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c39dff9342e4e0e16ce96be751eb21a94e94a87bb2f6e63ad1961c2ce109bf"
 dependencies = [
  "async-trait",
+]
+
+[[package]]
+name = "fake"
+version = "4.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f5f203b70a419cb8880d1cfe6bebe488add0a0307d404e9f24021e5fd864b80"
+dependencies = [
+ "deunicode",
+ "rand 0.9.1",
 ]
 
 [[package]]
@@ -2439,8 +2455,10 @@ dependencies = [
  "axum-prometheus",
  "axum-tracing-opentelemetry",
  "chrono",
+ "claims",
  "config",
  "dotenvy",
+ "fake",
  "futures-lite 2.6.0",
  "lapin",
  "metrics",

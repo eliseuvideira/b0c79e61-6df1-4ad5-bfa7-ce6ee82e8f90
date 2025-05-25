@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::{Context, Result};
 use aws_sdk_s3::Client as MinioClient;
 use axum::{
-    extract::{Request, State},
+    extract::{Query, Request, State},
     http::StatusCode,
     middleware::{from_fn, Next},
     response::{Html, IntoResponse, Response},
@@ -41,8 +41,8 @@ use crate::{
     db,
     error::Error,
     models::{
-        package::Package,
         job::{Job, JobStatus},
+        package::Package,
     },
     services::{minio, rabbitmq},
 };
@@ -118,6 +118,7 @@ impl Application {
 
         let router = Router::new()
             .route("/jobs", post(create_job))
+            .route("/jobs", get(get_jobs))
             .route("/", get(index))
             .route("/openapi", get(openapi))
             .layer(TraceLayer::new_for_http())
@@ -390,4 +391,69 @@ async fn parse_and_run_consume(
     consume_message(message, minio_client, db_pool)
         .instrument(span)
         .await
+}
+
+#[derive(Debug, Deserialize)]
+struct PaginationQuery {
+    limit: Option<u64>,
+    after: Option<Uuid>,
+    #[serde(default)]
+    order: Order,
+}
+
+#[derive(Debug, Deserialize)]
+enum Order {
+    #[serde(rename = "asc")]
+    Asc,
+    #[serde(rename = "desc")]
+    Desc,
+}
+
+impl Default for Order {
+    fn default() -> Self {
+        Self::Desc
+    }
+}
+
+impl Into<db::Order> for Order {
+    fn into(self) -> db::Order {
+        match self {
+            Self::Asc => db::Order::Asc,
+            Self::Desc => db::Order::Desc,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct WithPagination<T> {
+    data: Vec<T>,
+    has_more: bool,
+}
+
+async fn get_jobs(
+    Query(query): Query<PaginationQuery>,
+    State(app_state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, Error> {
+    let limit = query.limit.unwrap_or(100);
+    let after = query.after;
+    let order = query.order.into();
+
+    let mut conn = app_state.db.acquire().await?;
+    let jobs = db::get_jobs(&mut *conn, limit, after, order).await?;
+
+    Ok(Json(paginate(jobs, limit)))
+}
+
+fn paginate<T>(items: Vec<T>, limit: u64) -> WithPagination<T>
+where
+    T: Serialize,
+{
+    let has_more = items.len() > limit as usize;
+    let data = if has_more {
+        items.into_iter().take(limit as usize).collect()
+    } else {
+        items
+    };
+
+    WithPagination { data, has_more }
 }

@@ -10,8 +10,9 @@ RUN apt-get update -y \
   && apt-get autoremove -y \
   && apt-get clean -y \
   && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /usr/src/app/target/release/integrations_api ./integrations_api
+COPY --from=builder /usr/src/app/openapi.json ./openapi.json
 COPY --from=builder /usr/src/app/configs ./configs
+COPY --from=builder /usr/src/app/target/release/integrations_api ./integrations_api
 ENV APP_ENVIRONMENT=production
 ENTRYPOINT ["tini", "--"]
 CMD ["./integrations_api"]
