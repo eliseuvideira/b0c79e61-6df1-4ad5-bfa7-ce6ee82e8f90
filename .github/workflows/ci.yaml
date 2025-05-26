@@ -45,6 +45,12 @@ jobs:
           MINIO_ROOT_PASSWORD: minioadmin
           MINIO_ACCESS_KEY: minioadmin
           MINIO_SECRET_KEY: minioadmin
+        command: server /data
+        healthcheck:
+          test: ['CMD', 'curl', '-f', 'http://127.0.0.1:9000/minio/health/live']
+          interval: 30s
+          timeout: 20s
+          retries: 3
 
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +64,7 @@ jobs:
       - name: Wait for MinIO
         run: |
           echo "Waiting for MinIO to be healthy..."
-          timeout 60s bash -c 'until curl -sf http://localhost:9000/minio/health/live; do echo "MinIO not ready yet, sleeping..."; sleep 5; done'
+          timeout 60s bash -c 'until curl -sf http://127.0.0.1:9000/minio/health/live; do echo "MinIO not ready yet, sleeping..."; sleep 5; done'
           echo "MinIO is healthy!"
       - name: Create app user in Postgres
         run: |
@@ -130,6 +136,12 @@ jobs:
           MINIO_ROOT_PASSWORD: minioadmin
           MINIO_ACCESS_KEY: minioadmin
           MINIO_SECRET_KEY: minioadmin
+        command: server /data
+        healthcheck:
+          test: ['CMD', 'curl', '-f', 'http://127.0.0.1:9000/minio/health/live']
+          interval: 30s
+          timeout: 20s
+          retries: 3
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -144,7 +156,7 @@ jobs:
       - name: Wait for MinIO
         run: |
           echo "Waiting for MinIO to be healthy..."
-          timeout 60s bash -c 'until curl -sf http://localhost:9000/minio/health/live; do echo "MinIO not ready yet, sleeping..."; sleep 5; done'
+          timeout 60s bash -c 'until curl -sf http://127.0.0.1:9000/minio/health/live; do echo "MinIO not ready yet, sleeping..."; sleep 5; done'
           echo "MinIO is healthy!"
       - name: Create app user in Postgres
         run: |
