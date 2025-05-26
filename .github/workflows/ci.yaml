@@ -144,7 +144,11 @@ jobs:
       - name: Log MinIO
         run: |
           echo "MinIO logs:"
-          docker logs minio
+          containers=$(docker ps --format "{{.Names}}" -a)
+          for container in $containers; do
+            echo "Container: $container"
+            docker logs $container
+          done
       - name: Wait for MinIO
         run: |
           echo "Waiting for MinIO to be healthy..."
