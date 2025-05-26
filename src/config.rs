@@ -46,6 +46,7 @@ pub struct MinioConfig {
     pub url: String,
     pub username: SecretString,
     pub password: SecretString,
+    pub bucket_name: String,
 }
 
 impl MinioConfig {

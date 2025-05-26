@@ -1,22 +1,27 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "Integrations API",
-    "description": "API for package registry scrapper integrations",
+    "title": "Package Registry Scraper API",
+    "description": "Scrapes and tracks metadata from supported package registries like crates.io and jsr.io. Provides asynchronous job submission and tracking.",
     "version": "1.0.0"
   },
+  "tags": [
+    {
+      "name": "Jobs",
+      "description": "Operations related to scraping jobs"
+    }
+  ],
   "paths": {
     "/jobs": {
       "get": {
-        "summary": "Get jobs",
-        "description": "Get jobs",
-        "tags": ["jobs"],
+        "summary": "List jobs",
+        "description": "Retrieves a list of previously submitted scraping jobs. Supports cursor-based pagination.",
+        "tags": ["Jobs"],
         "parameters": [
           {
             "name": "limit",
             "in": "query",
-            "description": "Limit the number of jobs to return",
-            "required": false,
+            "description": "Maximum number of jobs to return",
             "schema": {
               "type": "integer",
               "default": 10
@@ -26,7 +31,6 @@
             "name": "order",
             "in": "query",
             "description": "Order the jobs by",
-            "required": false,
             "schema": {
               "type": "string",
               "enum": ["asc", "desc"]
@@ -49,7 +53,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaginatedJobResponse"
+                  "$ref": "#/components/schemas/JobListResponse"
                 }
               }
             }
@@ -57,29 +61,33 @@
         }
       },
       "post": {
-        "summary": "Create a new job",
-        "description": "Initiates a job for the specified package from the registry",
-        "tags": ["jobs"],
+        "summary": "Create job",
+        "description": "Creates a new scraping job for a specific package registry and package name.",
+        "tags": ["Jobs"],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/JobRequest"
+                "$ref": "#/components/schemas/CreateJobRequest"
+              },
+              "example": {
+                "registry_name": "crates.io",
+                "package_name": "tokio"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Job accepted",
+            "description": "Job successfully created",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "data": {
-                      "$ref": "#/components/schemas/JobResponse"
+                      "$ref": "#/components/schemas/JobResponseWrapper"
                     }
                   }
                 }
@@ -87,7 +95,14 @@
             }
           },
           "400": {
-            "description": "Bad request"
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -95,8 +110,8 @@
     "/jobs/{id}": {
       "get": {
         "summary": "Get job by ID",
-        "description": "Retrieves a specific job by its unique identifier.",
-        "tags": ["jobs"],
+        "description": "Retrieves a specific scraping job by its unique identifier.",
+        "tags": ["Jobs"],
         "parameters": [
           {
             "name": "id",
@@ -111,22 +126,24 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response with job details",
+            "description": "Job details",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/JobResponse"
-                    }
-                  }
+                  "$ref": "#/components/schemas/JobResponseWrapper"
                 }
               }
             }
           },
           "404": {
-            "description": "Job not found"
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -134,48 +151,33 @@
   },
   "components": {
     "schemas": {
-      "PaginatedJobResponse": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/JobResponse"
-            }
-          },
-          "next_cursor": {
-            "type": ["string", "null"],
-            "description": "Cursor for pagination to fetch the next page of results"
-          }
-        }
-      },
-      "JobRequest": {
+      "CreateJobRequest": {
         "type": "object",
         "required": ["registry_name", "package_name"],
         "properties": {
           "registry_name": {
             "type": "string",
             "enum": ["crates.io", "jsr.io"],
-            "description": "Name of the package registry"
+            "description": "The registry where the package is hosted"
           },
           "package_name": {
             "type": "string",
-            "description": "Name of the package to scrap"
+            "description": "Name of the package to scrape"
           }
         }
       },
-      "JobResponse": {
+      "Job": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "description": "Unique identifier for the created job"
+            "description": "Unique identifier of the job"
           },
           "registry_name": {
             "type": "string",
-            "enum": ["crates.io"],
-            "description": "Name of the package registry"
+            "enum": ["crates.io", "jsr.io"],
+            "description": "The registry name"
           },
           "package_name": {
             "type": "string",
@@ -184,16 +186,66 @@
           "status": {
             "type": "string",
             "enum": ["processing", "complete"],
-            "description": "Status of the job"
+            "description": "Current status of the job"
           },
           "trace_id": {
             "type": "string",
-            "description": "Trace identifier for logging and debugging"
+            "description": "Trace ID for correlating logs"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "description": "Timestamp when the job was created"
+          }
+        },
+        "example": {
+          "id": "a79f1b0c-85f3-4e45-b3b2-cff1b162a021",
+          "registry_name": "crates.io",
+          "package_name": "tokio",
+          "status": "processing",
+          "trace_id": "abc123",
+          "created_at": "2025-05-26T14:00:00Z"
+        }
+      },
+      "JobResponseWrapper": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Job"
+          }
+        }
+      },
+      "JobListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Job"
+            }
+          },
+          "next_cursor": {
+            "type": ["string", "null"],
+            "description": "Cursor for fetching the next page of results"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "Describes the nature of the error"
+              }
+            }
+          }
+        },
+        "example": {
+          "error": {
+            "message": "Job not found"
           }
         }
       }

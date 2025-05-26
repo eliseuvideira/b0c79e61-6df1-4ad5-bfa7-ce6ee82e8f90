@@ -41,3 +41,4 @@ registry_queues = [
 url = "http://127.0.0.1:9000"
 username = "minioadmin"
 password = "minioadmin"
+bucket_name = "integrations"

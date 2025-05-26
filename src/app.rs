@@ -44,6 +44,8 @@ impl Application {
 
         let minio_client = minio::create_client(&configuration.minio).await?;
 
+        minio::ensure_bucket(&minio_client, &configuration.minio.bucket_name).await?;
+
         let integration_queues: HashMap<String, String> = configuration
             .rabbitmq
             .registry_queues
@@ -55,6 +57,7 @@ impl Application {
             rabbitmq_connection.clone(),
             queue_consumer.clone(),
             minio_client.clone(),
+            configuration.minio.bucket_name.clone(),
             db_pool.clone(),
         )
         .await?;

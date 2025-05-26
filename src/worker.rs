@@ -25,6 +25,7 @@ pub struct Worker {
     rabbitmq_connection: Arc<Connection>,
     consumer_queue: String,
     minio_client: Client,
+    bucket_name: Arc<String>,
     db_pool: Pool<Postgres>,
 }
 
@@ -33,12 +34,14 @@ impl Worker {
         rabbitmq_connection: Arc<Connection>,
         consumer_queue: String,
         minio_client: Client,
+        bucket_name: String,
         db_pool: Pool<Postgres>,
     ) -> Result<Self> {
         Ok(Self {
             rabbitmq_connection,
             consumer_queue,
             minio_client,
+            bucket_name: Arc::new(bucket_name),
             db_pool,
         })
     }
@@ -50,6 +53,7 @@ impl Worker {
         consumer.set_delegate(move |delivery: DeliveryResult| {
             let minio_client = self.minio_client.clone();
             let db_pool = self.db_pool.clone();
+            let bucket_name = self.bucket_name.clone();
 
             async move {
                 match delivery {
@@ -58,6 +62,7 @@ impl Worker {
                             &delivery.data,
                             delivery.properties.headers(),
                             minio_client,
+                            &bucket_name,
                             db_pool,
                         )
                         .await
@@ -96,6 +101,7 @@ async fn parse_and_run_consume(
     data: &[u8],
     headers: &Option<FieldTable>,
     minio_client: Client,
+    bucket_name: &str,
     db_pool: Pool<Postgres>,
 ) -> Result<()> {
     let message = serde_json::from_slice::<types::JobMessage>(data)?;
@@ -111,7 +117,7 @@ async fn parse_and_run_consume(
     };
     let _ = span.enter();
 
-    consume_message(message, minio_client, db_pool)
+    consume_message(message, minio_client, bucket_name, db_pool)
         .instrument(span)
         .await
 }
@@ -136,11 +142,12 @@ impl<'a> Extractor for FieldTableExtractor<'a> {
 pub async fn consume_message(
     message: JobMessage,
     minio_client: Client,
+    bucket_name: &str,
     db_pool: Pool<Postgres>,
 ) -> Result<()> {
     let response = minio_client
         .get_object()
-        .bucket("outputs")
+        .bucket(bucket_name)
         .key(format!("outputs/{}.json", message.package_name))
         .send()
         .await?;
