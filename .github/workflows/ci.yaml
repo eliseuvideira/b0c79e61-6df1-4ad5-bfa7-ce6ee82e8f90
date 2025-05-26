@@ -141,6 +141,10 @@ jobs:
           --features ${{ env.SQLX_FEATURES }}
           --no-default-features
           --locked
+      - name: Log MinIO
+        run: |
+          echo "MinIO logs:"
+          docker logs minio
       - name: Wait for MinIO
         run: |
           echo "Waiting for MinIO to be healthy..."
