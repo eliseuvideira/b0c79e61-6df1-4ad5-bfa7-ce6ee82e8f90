@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
@@ -27,6 +27,7 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
     Router::new()
         .route("/jobs", post(create_job))
         .route("/jobs", get(get_jobs))
+        .route("/jobs/:id", get(get_job_by_id))
         .with_state(app_state)
 }
 
@@ -93,4 +94,20 @@ pub async fn get_jobs(
     let jobs = db::get_jobs(&mut conn, limit, cursor, order).await?;
 
     Ok(Json(ApiResponsePagination::new(jobs, limit)))
+}
+
+#[instrument(name = "get_job_by_id", skip(app_state))]
+pub async fn get_job_by_id(
+    Path(id): Path<String>,
+    State(app_state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, Error> {
+    let id = Uuid::parse_str(&id).context("Invalid job ID")?;
+
+    let mut conn = app_state.db_pool.acquire().await?;
+    let job = db::get_job_by_id(&mut conn, id).await?;
+
+    match job {
+        Some(job) => Ok(Json(ApiResponse::new(job))),
+        None => Err(Error::NotFound("Not found".to_string())),
+    }
 }

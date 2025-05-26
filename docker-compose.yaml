@@ -12,7 +12,17 @@ services:
       - integrations
     restart: always
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres-storage:/var/lib/postgresql/data
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    ports:
+      - 9187:9187
+    environment:
+      - DATA_SOURCE_NAME=postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:$POSTGRES_PORT/$POSTGRES_DB?sslmode=disable
+    networks:
+      - integrations
+    restart: always
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -24,7 +34,8 @@ services:
     environment:
       - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbitmq_management prometheus_metrics
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq-storage:/var/lib/rabbitmq
+    restart: always
     healthcheck:
       test: [ "CMD", "rabbitmq-diagnostics", "check_port_connectivity" ]
       interval: 30s
@@ -33,9 +44,33 @@ services:
     networks:
       - integrations
 
+  minio:
+    image: minio/minio:latest
+    ports:
+      - 9000:9000
+      - 9001:9001
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_PROMETHEUS_AUTH_TYPE: "public"
+    volumes:
+      - minio-storage:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - integrations
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: always
+
 volumes:
-  postgres_data:
-  rabbitmq_data:
+  postgres-storage:
+  rabbitmq-storage:
+  minio-storage:
 
 
 networks:

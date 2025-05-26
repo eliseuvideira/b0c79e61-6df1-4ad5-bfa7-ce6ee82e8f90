@@ -8,6 +8,7 @@ services:
       - "/var/tempo"
     networks:
       - observability
+    restart: always
     volumes:
       - tempo-storage:/var/tempo
 
@@ -22,6 +23,7 @@ services:
       - "4317"
     depends_on:
       - init
+    restart: always
     networks:
       - observability
 
@@ -36,6 +38,7 @@ services:
       - "3000:3000"
     networks:
       - observability
+    restart: always
     volumes:
       - grafana-storage:/var/lib/grafana
 
@@ -51,6 +54,7 @@ services:
       - prometheus-storage:/prometheus
       - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
       - ./rules.yaml:/etc/prometheus/rules.yaml:ro
+    restart: always
     networks:
       - observability
 
@@ -76,6 +80,7 @@ services:
     command: [ "--config.file=/etc/loki/loki-config.yaml" ]
     networks:
       - observability
+    restart: always
     volumes:
       - loki-storage:/loki
       - ./loki.yaml:/etc/loki/loki-config.yaml:ro
@@ -84,6 +89,7 @@ services:
     image: prom/pushgateway:latest
     ports:
       - "9091:9091"
+    restart: always
     networks:
       - observability
 

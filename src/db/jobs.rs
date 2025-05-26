@@ -124,3 +124,13 @@ async fn get_jobs_with_limit_after(
         }
     }
 }
+
+#[instrument(name = "get_one", skip(conn))]
+pub async fn get_job_by_id(conn: &mut PgConnection, id: Uuid) -> Result<Option<Job>> {
+    let job = sqlx::query_as!(Job, "SELECT * FROM jobs WHERE id = $1;", id)
+        .fetch_optional(conn)
+        .instrument(instrument_query(Operation::Select, "jobs"))
+        .await?;
+
+    Ok(job)
+}

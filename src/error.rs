@@ -7,6 +7,8 @@ use serde::Serialize;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("{0}")]
+    NotFound(String),
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
@@ -25,6 +27,9 @@ struct ErrorResponse {
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         match self {
+            Error::NotFound(message) => {
+                (StatusCode::NOT_FOUND, Json(ErrorResponse { message })).into_response()
+            }
             Error::Io(_) | Error::Unknown(_) | Error::Sqlx(_) | Error::RabbitMQ(_) => {
                 tracing::error!(
                     error = ?self,

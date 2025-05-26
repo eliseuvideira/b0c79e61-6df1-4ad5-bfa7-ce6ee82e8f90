@@ -91,6 +91,45 @@
           }
         }
       }
+    },
+    "/jobs/{id}": {
+      "get": {
+        "summary": "Get job by ID",
+        "description": "Retrieves a specific job by its unique identifier.",
+        "tags": ["jobs"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the job to retrieve",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response with job details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/JobResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found"
+          }
+        }
+      }
     }
   },
   "components": {

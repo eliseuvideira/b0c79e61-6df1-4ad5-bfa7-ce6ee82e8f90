@@ -337,3 +337,78 @@ async fn test_get_jobs_paginates_properly() -> Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_get_job_by_id_returns_200() -> Result<()> {
+    // Arrange
+    let app = spawn_app().await?;
+    let client = reqwest::Client::new();
+
+    let (registry_name, _) = app
+        .integration_queues
+        .iter()
+        .next()
+        .expect("No registry name");
+
+    let package_name: String = fake::faker::name::en::Name().fake();
+    let response = client
+        .post(format!("{}/jobs", app.address))
+        .json(&json!({
+            "registry_name": registry_name,
+            "package_name": package_name,
+        }))
+        .send()
+        .await?;
+
+    let body: serde_json::Value = response.json().await?;
+    let job_id = body["data"]["id"].as_str().unwrap();
+
+    // Act
+    let response = client
+        .get(format!("{}/jobs/{}", app.address, job_id))
+        .send()
+        .await?;
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::OK);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_job_by_id_returns_200_with_job_object() -> Result<()> {
+    // Arrange
+    let app = spawn_app().await?;
+    let client = reqwest::Client::new();
+
+    let (registry_name, _) = app
+        .integration_queues
+        .iter()
+        .next()
+        .expect("No registry name");
+
+    let package_name: String = fake::faker::name::en::Name().fake();
+    let response = client
+        .post(format!("{}/jobs", app.address))
+        .json(&json!({
+            "registry_name": registry_name,
+            "package_name": package_name,
+        }))
+        .send()
+        .await?;
+    let body: serde_json::Value = response.json().await?;
+    let job_id = body["data"]["id"].as_str().unwrap();
+
+    // Act
+    let response = client
+        .get(format!("{}/jobs/{}", app.address, job_id))
+        .send()
+        .await?;
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::OK);
+    let body: serde_json::Value = response.json().await?;
+    assert_eq!(body["data"]["id"], job_id);
+
+    Ok(())
+}
