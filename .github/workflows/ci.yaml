@@ -36,16 +36,6 @@ jobs:
         image: rabbitmq:3
         ports:
           - 5672:5672
-      minio:
-        image: minio/minio:latest-cicd
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-          MINIO_ACCESS_KEY: minioadmin
-          MINIO_SECRET_KEY: minioadmin
-        ports:
-          - 9000:9000
-
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -55,6 +45,17 @@ jobs:
           --features ${{ env.SQLX_FEATURES }}
           --no-default-features
           --locked
+      - name: Start MinIO container for test job
+        run: |
+          docker run -d \
+            -p 9000:9000 \
+            -p 9001:9001 \
+            --name minio_test_container \
+            -e "MINIO_ROOT_USER=minioadmin" \
+            -e "MINIO_ROOT_PASSWORD=minioadmin" \
+            -e "MINIO_ACCESS_KEY=minioadmin" \
+            -e "MINIO_SECRET_KEY=minioadmin" \
+            minio/minio:latest server /data --console-address :9001
       - name: Wait for MinIO
         run: |
           echo "Waiting for MinIO to be healthy..."
@@ -121,15 +122,6 @@ jobs:
         image: rabbitmq:3
         ports:
           - 5672:5672
-      minio:
-        image: minio/minio:latest-cicd
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-          MINIO_ACCESS_KEY: minioadmin
-          MINIO_SECRET_KEY: minioadmin
-        ports:
-          - 9000:9000
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -141,14 +133,17 @@ jobs:
           --features ${{ env.SQLX_FEATURES }}
           --no-default-features
           --locked
-      - name: Log MinIO
+      - name: Start MinIO container for test job
         run: |
-          echo "MinIO logs:"
-          containers=$(docker ps --format "{{.Names}}" -a)
-          for container in $containers; do
-            echo "Container: $container"
-            docker logs $container
-          done
+          docker run -d \
+            -p 9000:9000 \
+            -p 9001:9001 \
+            --name minio_test_container \
+            -e "MINIO_ROOT_USER=minioadmin" \
+            -e "MINIO_ROOT_PASSWORD=minioadmin" \
+            -e "MINIO_ACCESS_KEY=minioadmin" \
+            -e "MINIO_SECRET_KEY=minioadmin" \
+            minio/minio:latest server /data --console-address :9001
       - name: Wait for MinIO
         run: |
           echo "Waiting for MinIO to be healthy..."
