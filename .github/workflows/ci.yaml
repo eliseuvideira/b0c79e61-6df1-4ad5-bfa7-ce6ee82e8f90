@@ -38,19 +38,19 @@ jobs:
           - 5672:5672
       minio:
         image: minio/minio:latest
-        ports:
-          - 9000:9000
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadmin
           MINIO_ACCESS_KEY: minioadmin
           MINIO_SECRET_KEY: minioadmin
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/ready || exit 1"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
         command: server /data
-        healthcheck:
-          test: ['CMD', 'curl', '-f', 'http://127.0.0.1:9000/minio/health/live']
-          interval: 30s
-          timeout: 20s
-          retries: 3
 
     steps:
       - uses: actions/checkout@v4
@@ -129,19 +129,19 @@ jobs:
           - 5672:5672
       minio:
         image: minio/minio:latest
-        ports:
-          - 9000:9000
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadmin
           MINIO_ACCESS_KEY: minioadmin
           MINIO_SECRET_KEY: minioadmin
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/ready || exit 1"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
         command: server /data
-        healthcheck:
-          test: ['CMD', 'curl', '-f', 'http://127.0.0.1:9000/minio/health/live']
-          interval: 30s
-          timeout: 20s
-          retries: 3
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
