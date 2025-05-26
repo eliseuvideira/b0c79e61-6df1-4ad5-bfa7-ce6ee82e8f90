@@ -55,6 +55,11 @@ jobs:
           --features ${{ env.SQLX_FEATURES }}
           --no-default-features
           --locked
+      - name: Wait for MinIO
+        run: |
+          echo "Waiting for MinIO to be healthy..."
+          timeout 60s bash -c 'until curl -sf http://localhost:9000/minio/health/live; do echo "MinIO not ready yet, sleeping..."; sleep 5; done'
+          echo "MinIO is healthy!"
       - name: Create app user in Postgres
         run: |
           sudo apt-get install postgresql-client
@@ -136,6 +141,11 @@ jobs:
           --features ${{ env.SQLX_FEATURES }}
           --no-default-features
           --locked
+      - name: Wait for MinIO
+        run: |
+          echo "Waiting for MinIO to be healthy..."
+          timeout 60s bash -c 'until curl -sf http://localhost:9000/minio/health/live; do echo "MinIO not ready yet, sleeping..."; sleep 5; done'
+          echo "MinIO is healthy!"
       - name: Create app user in Postgres
         run: |
           sudo apt-get install postgresql-client
