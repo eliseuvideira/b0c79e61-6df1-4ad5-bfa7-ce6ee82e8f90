@@ -38,6 +38,7 @@ pub async fn spawn_app() -> Result<TestApp> {
         configuration.rabbitmq.queues = queues;
         configuration.rabbitmq.queue_consumer = queue_consumer.clone();
         configuration.rabbitmq.registry_queues = registry_queues.clone();
+        configuration.minio.bucket_name = Uuid::new_v4().to_string();
         configuration
     };
 
