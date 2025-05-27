@@ -22,3 +22,21 @@ impl Default for Order {
         Self::Asc
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_order_default() {
+        assert_eq!(Order::default(), Order::Asc);
+    }
+
+    #[test]
+    fn test_order_display() {
+        assert_eq!(Order::Asc.to_string(), "ASC");
+        assert_eq!(Order::Desc.to_string(), "DESC");
+        assert_eq!(format!("{}", Order::Asc), "ASC");
+        assert_eq!(format!("{}", Order::Desc), "DESC");
+    }
+}

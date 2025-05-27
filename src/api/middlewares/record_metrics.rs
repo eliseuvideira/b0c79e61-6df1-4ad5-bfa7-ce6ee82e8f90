@@ -22,7 +22,7 @@ fn get_method(req: &Request) -> &'static str {
         Method::TRACE => "TRACE",
         Method::CONNECT => "CONNECT",
         Method::PATCH => "PATCH",
-        _ => "",
+        _ => "UNKNOWN",
     }
 }
 
@@ -68,6 +68,8 @@ pub async fn record_metrics(
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use axum::body::Body;
 
     use super::*;
@@ -81,6 +83,11 @@ mod tests {
             (Method::DELETE, "DELETE"),
             (Method::HEAD, "HEAD"),
             (Method::OPTIONS, "OPTIONS"),
+            (Method::PATCH, "PATCH"),
+            (Method::TRACE, "TRACE"),
+            (Method::CONNECT, "CONNECT"),
+            (Method::from_str("UNKNOWN").unwrap(), "UNKNOWN"),
+            (Method::from_str("INVALID").unwrap(), "UNKNOWN"),
         ] {
             let req = Request::builder()
                 .method(method)
