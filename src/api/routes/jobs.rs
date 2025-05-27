@@ -15,7 +15,7 @@ use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
-    api::types::{ApiResponse, ApiResponsePagination, AppState, PaginationQuery},
+    api::types::{ApiResponse, ApiResponseList, AppState, PaginationQuery},
     db,
     error::Error,
     models::job::{Job, JobStatus},
@@ -93,7 +93,7 @@ pub async fn get_jobs(
     let mut conn = app_state.db_pool.acquire().await?;
     let jobs = db::get_jobs(&mut conn, limit, cursor, order).await?;
 
-    Ok(Json(ApiResponsePagination::new(jobs, limit)))
+    Ok(Json(ApiResponseList::new(jobs, limit)))
 }
 
 #[instrument(name = "get_job_by_id", skip(app_state))]
@@ -104,10 +104,9 @@ pub async fn get_job_by_id(
     let id = Uuid::parse_str(&id).context("Invalid job ID")?;
 
     let mut conn = app_state.db_pool.acquire().await?;
-    let job = db::get_job_by_id(&mut conn, id).await?;
+    let Some(job) = db::get_job_by_id(&mut conn, id).await? else {
+        return Err(Error::NotFound("Not found".to_string()));
+    };
 
-    match job {
-        Some(job) => Ok(Json(ApiResponse::new(job))),
-        None => Err(Error::NotFound("Not found".to_string())),
-    }
+    Ok(Json(ApiResponse::new(job)))
 }

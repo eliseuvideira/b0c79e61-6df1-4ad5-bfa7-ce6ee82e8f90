@@ -3,3 +3,4 @@ mod helpers;
 mod jobs;
 mod metrics;
 mod not_found;
+mod openapi;

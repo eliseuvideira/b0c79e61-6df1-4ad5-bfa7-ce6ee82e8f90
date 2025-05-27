@@ -1,5 +1,9 @@
 use anyhow::Result;
-use opentelemetry::{propagation::TextMapCompositePropagator, trace::TracerProvider, KeyValue};
+use opentelemetry::{
+    propagation::TextMapCompositePropagator,
+    trace::{TraceContextExt, TracerProvider},
+    KeyValue,
+};
 use opentelemetry_otlp::Protocol;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
@@ -9,9 +13,9 @@ use opentelemetry_sdk::{
 };
 use opentelemetry_semantic_conventions::resource;
 use tokio::{spawn, task::JoinHandle};
-use tracing::{level_filters::LevelFilter, Subscriber};
+use tracing::{level_filters::LevelFilter, Span, Subscriber};
 use tracing_loki::BackgroundTask;
-use tracing_opentelemetry::OpenTelemetryLayer;
+use tracing_opentelemetry::{OpenTelemetryLayer, OpenTelemetrySpanExt};
 use tracing_subscriber::{layer::SubscriberExt, EnvFilter};
 use tracing_subscriber::{registry::LookupSpan, Layer};
 use url::Url;
@@ -188,4 +192,14 @@ pub fn instrument_query(operation: Operation, table_name: &str) -> tracing::Span
         otel.kind = "CLIENT",
         otel.status_code = tracing::field::Empty,
     )
+}
+
+pub fn propagate_trace_id() {
+    let span = Span::current();
+    let context = span.context();
+    let otel_context = context.span().span_context().clone();
+    if otel_context.is_valid() {
+        let trace_id = otel_context.trace_id().to_string();
+        span.record("trace_id", trace_id);
+    }
 }

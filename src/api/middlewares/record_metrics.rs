@@ -65,3 +65,28 @@ pub async fn record_metrics(
 
     response
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::body::Body;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_method_returns_method() {
+        for (method, expected) in [
+            (Method::GET, "GET"),
+            (Method::POST, "POST"),
+            (Method::PUT, "PUT"),
+            (Method::DELETE, "DELETE"),
+            (Method::HEAD, "HEAD"),
+            (Method::OPTIONS, "OPTIONS"),
+        ] {
+            let req = Request::builder()
+                .method(method)
+                .body(Body::from(()))
+                .unwrap();
+            assert_eq!(get_method(&req), expected);
+        }
+    }
+}

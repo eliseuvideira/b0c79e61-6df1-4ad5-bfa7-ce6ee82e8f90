@@ -8,12 +8,12 @@ use uuid::Uuid;
 use crate::{db, types::Cursor};
 
 #[derive(Debug, Serialize)]
-pub struct ApiResponsePagination<T> {
+pub struct ApiResponseList<T> {
     pub data: Vec<T>,
     pub next_cursor: Option<String>,
 }
 
-impl<T> ApiResponsePagination<T>
+impl<T> ApiResponseList<T>
 where
     T: Serialize + Cursor,
 {
@@ -21,16 +21,12 @@ where
         let mut data = items;
         let has_more = data.len() > limit as usize;
 
-        let (data, last) = if has_more {
-            match data.pop() {
-                Some(last) => (data, Some(last)),
-                None => (data, None),
-            }
+        let next_cursor = if has_more {
+            let remaining = data.split_off(limit as usize);
+            remaining.first().map(|item| item.cursor())
         } else {
-            (data, None)
+            None
         };
-
-        let next_cursor = last.map(|last| last.cursor());
 
         Self { data, next_cursor }
     }
@@ -58,7 +54,7 @@ pub struct PaginationQuery {
     pub order: Order,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq, Copy, Clone)]
 pub enum Order {
     #[serde(rename = "asc")]
     Asc,
@@ -86,4 +82,109 @@ pub struct AppState {
     pub rabbitmq_connection: Arc<Connection>,
     pub integration_queues: HashMap<String, String>,
     pub exchange_name: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use serde::Serialize;
+    use uuid::Uuid;
+
+    use crate::{
+        api::types::{ApiResponse, ApiResponseList, Order},
+        db,
+        types::Cursor,
+    };
+
+    #[derive(Serialize)]
+    struct Item {
+        id: String,
+    }
+    impl Cursor for Item {
+        fn cursor(&self) -> String {
+            self.id.to_string()
+        }
+    }
+
+    #[test]
+    fn test_api_response_list_returns_no_next_cursor() {
+        // Arrange
+        let items: Vec<Item> = (0..100)
+            .map(|i| Item {
+                id: Uuid::from_u64_pair(i as u64, 0).to_string(),
+            })
+            .collect();
+        assert_eq!(items.len(), 100);
+
+        // Act
+        let list = ApiResponseList::new(items, 100);
+
+        // Assert
+        assert_eq!(list.next_cursor, None);
+        assert_eq!(list.data.len(), 100);
+    }
+
+    #[test]
+    fn test_api_response_list_returns_next_cursor() {
+        // Arrange
+        let items: Vec<Item> = (0..=100)
+            .map(|i| Item {
+                id: Uuid::from_u64_pair(i as u64, 0).to_string(),
+            })
+            .collect();
+        assert_eq!(items.len(), 101);
+
+        // Act
+        let list = ApiResponseList::new(items, 100);
+
+        // Assert
+        assert_eq!(list.data.len(), 100);
+        assert_eq!(
+            list.next_cursor,
+            Some(Uuid::from_u64_pair(100, 0).to_string())
+        );
+    }
+
+    #[test]
+    fn test_api_response_wraps_data_in_json() {
+        // Arrange
+        let uuid = Uuid::from_u64_pair(0, 0);
+        let item: Item = Item {
+            id: uuid.to_string(),
+        };
+
+        // Act
+        let list = ApiResponse::new(item);
+
+        // Assert
+        let json = serde_json::to_string(&list).unwrap();
+        assert_eq!(
+            json,
+            "{\"data\":{\"id\":\"00000000-0000-0000-0000-000000000000\"}}"
+        );
+    }
+
+    #[test]
+    fn test_order_is_default_to_desc() {
+        assert_eq!(Order::default(), Order::Desc);
+    }
+
+    #[test]
+    fn test_order_converts_to_db_order_for_asc() {
+        let api_order = Order::Asc;
+        let db_order = db::Order::from(api_order);
+        assert_eq!(db_order, db::Order::Asc);
+
+        let db_order: db::Order = api_order.into();
+        assert_eq!(db_order, db::Order::Asc);
+    }
+
+    #[test]
+    fn test_order_converts_to_db_order_for_desc() {
+        let api_order = Order::Desc;
+        let db_order = db::Order::from(api_order);
+        assert_eq!(db_order, db::Order::Desc);
+
+        let db_order: db::Order = api_order.into();
+        assert_eq!(db_order, db::Order::Desc);
+    }
 }
