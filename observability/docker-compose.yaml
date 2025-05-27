@@ -8,7 +8,6 @@ services:
       - "/var/tempo"
     networks:
       - observability
-    restart: always
     volumes:
       - tempo-storage:/var/tempo
 
