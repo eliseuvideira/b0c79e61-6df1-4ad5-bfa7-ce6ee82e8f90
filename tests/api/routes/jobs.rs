@@ -39,11 +39,7 @@ async fn test_create_job_inserts_into_db() -> Result<()> {
     // Arrange
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
-    let (registry_name, _) = app
-        .integration_queues
-        .iter()
-        .next()
-        .expect("No registry name");
+    let (registry_name, _) = app.get_registry_queue().await;
 
     // Act
     client
@@ -61,7 +57,7 @@ async fn test_create_job_inserts_into_db() -> Result<()> {
         .fetch_all(db_pool)
         .await?;
     assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].registry_name, *registry_name);
+    assert_eq!(rows[0].registry_name, registry_name);
     assert_eq!(rows[0].package_name, "serde");
 
     Ok(())

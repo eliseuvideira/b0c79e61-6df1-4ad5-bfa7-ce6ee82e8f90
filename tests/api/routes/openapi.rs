@@ -1,20 +1,28 @@
+use anyhow::Result;
+
 use crate::helpers::spawn_app;
 
 #[tokio::test]
-async fn test_openapi_returns_200() {
+async fn test_openapi_returns_200() -> Result<()> {
     // Arrange
-    let app = spawn_app().await.expect("Failed to spawn app.");
+    let app = spawn_app().await?;
     let client = reqwest::Client::new();
 
     // Act
-    let response = client
-        .get(format!("{}/openapi", &app.address))
-        .send()
-        .await
-        .expect("Failed to execute request.");
+    let url = format!("{}/openapi.json", &app.address);
+    let response = client.get(url).send().await?;
 
     // Assert
     assert_eq!(response.status().as_u16(), 200);
+    assert_eq!(
+        response
+            .headers()
+            .get("content-type")
+            .ok_or(anyhow::anyhow!("Content-Type header not found"))?,
+        "application/json"
+    );
+
+    Ok(())
 }
 
 #[tokio::test]

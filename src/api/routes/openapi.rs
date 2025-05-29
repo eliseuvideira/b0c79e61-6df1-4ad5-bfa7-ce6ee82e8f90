@@ -1,7 +1,20 @@
-use axum::response::{Html, IntoResponse};
+use axum::{
+    body::Body,
+    response::{Html, IntoResponse, Response},
+    routing::get,
+    Router,
+};
+use http::header;
+use mime;
 use scalar_doc::Documentation;
 
-pub async fn index() -> impl IntoResponse {
+pub fn create_router() -> Router {
+    Router::new()
+        .route("/", get(index))
+        .route("/openapi.json", get(openapi))
+}
+
+async fn index() -> impl IntoResponse {
     Html(
         Documentation::new("Integrations API", "/openapi")
             .build()
@@ -9,6 +22,9 @@ pub async fn index() -> impl IntoResponse {
     )
 }
 
-pub async fn openapi() -> &'static str {
-    include_str!("../../../openapi.json")
+async fn openapi() -> impl IntoResponse {
+    Response::builder()
+        .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+        .body(Body::from(include_str!("../../../openapi.json")))
+        .unwrap()
 }

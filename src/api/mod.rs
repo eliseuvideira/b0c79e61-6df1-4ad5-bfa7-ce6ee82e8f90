@@ -55,8 +55,7 @@ impl Api {
 
         let router = Router::new()
             .merge(routes::jobs::create_router(app_state.clone()))
-            .route("/", get(routes::index))
-            .route("/openapi", get(routes::openapi))
+            .merge(routes::openapi::create_router())
             .layer(TraceLayer::new_for_http())
             .layer(from_fn(middlewares::tracing::attach_trace_id))
             .layer(from_fn_with_state(
@@ -66,7 +65,7 @@ impl Api {
             .layer(OtelInResponseLayer)
             .layer(OtelAxumLayer::default())
             .merge(routes::metrics::create_router(metrics.clone()))
-            .route("/health", get(routes::health_check))
+            .route("/health", get(health_check))
             .fallback(not_found);
 
         let server = axum::serve(listener, router);
@@ -85,4 +84,8 @@ impl Api {
 
 async fn not_found() -> StatusCode {
     StatusCode::NOT_FOUND
+}
+
+async fn health_check() -> StatusCode {
+    StatusCode::NO_CONTENT
 }

@@ -1,7 +1,7 @@
 use crate::helpers::spawn_app;
 
 #[tokio::test]
-async fn health_check_works() {
+async fn test_health_check_returns_204_with_no_content() {
     // Arrange
     let app = spawn_app().await.expect("Failed to spawn app");
     let client = reqwest::Client::new();

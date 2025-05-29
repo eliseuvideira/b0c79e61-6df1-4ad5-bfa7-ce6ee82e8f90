@@ -18,6 +18,13 @@ pub struct TestApp {
     pub integration_queues: HashMap<String, String>,
 }
 
+impl TestApp {
+    pub async fn get_registry_queue(&self) -> (String, String) {
+        let (registry_name, queue) = self.integration_queues.iter().next().unwrap();
+        (registry_name.clone(), queue.clone())
+    }
+}
+
 pub async fn spawn_app() -> Result<TestApp> {
     dotenvy::dotenv().ok();
 
