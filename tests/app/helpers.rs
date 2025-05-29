@@ -1,13 +1,18 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, Result};
+use fake::{faker::name::en::Name, Fake};
 use integrations_api::{
+    api::types::ApiResponse,
     app::Application,
     config::{Config, DatabaseConfig},
+    models::job::Job,
     services::rabbitmq,
     telemetry::Metrics,
 };
 use lapin::Channel;
+use reqwest::Client;
+use serde_json::json;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 
@@ -19,9 +24,49 @@ pub struct TestApp {
 }
 
 impl TestApp {
-    pub async fn get_registry_queue(&self) -> (String, String) {
-        let (registry_name, queue) = self.integration_queues.iter().next().unwrap();
-        (registry_name.clone(), queue.clone())
+    pub fn registry_queue(&self) -> Result<(String, String)> {
+        let (registry_name, queue) = self
+            .integration_queues
+            .iter()
+            .next()
+            .ok_or(anyhow::anyhow!("No registry queue"))?;
+        Ok((registry_name.clone(), queue.clone()))
+    }
+
+    pub async fn mock_create_job(
+        &self,
+        client: &Client,
+        registry_name: &str,
+    ) -> Result<ApiResponse<Job>> {
+        let package_name: String = Name().fake();
+        let url = format!("{}/jobs", self.address);
+        let response = client
+            .post(url)
+            .json(&json!({
+                "registry_name": registry_name,
+                "package_name": package_name,
+            }))
+            .send()
+            .await?;
+
+        let body: ApiResponse<Job> = response.json().await?;
+
+        Ok(body)
+    }
+
+    pub async fn mock_create_jobs(
+        &self,
+        client: &Client,
+        registry_name: &str,
+        count: u64,
+    ) -> Result<Vec<ApiResponse<Job>>> {
+        let mut jobs = Vec::new();
+        for _ in 0..count {
+            let response = self.mock_create_job(client, registry_name).await?;
+            jobs.push(response);
+        }
+
+        Ok(jobs)
     }
 }
 

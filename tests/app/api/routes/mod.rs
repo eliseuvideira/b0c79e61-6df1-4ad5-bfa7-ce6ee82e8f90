@@ -1,4 +1,3 @@
-pub mod health;
 pub mod jobs;
 pub mod openapi;
 
@@ -29,21 +28,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_health_check_returns_204_with_no_content() {
+    async fn test_health_check_returns_204_with_no_content() -> Result<()> {
         // Arrange
-        let app = spawn_app().await.expect("Failed to spawn app");
+        let app = spawn_app().await?;
         let client = reqwest::Client::new();
 
         // Act
-        let response = client
-            .get(format!("{}/health", &app.address))
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let url = format!("{}/health", &app.address);
+        let response = client.get(url).send().await?;
 
         // Assert
         assert_eq!(response.status().as_u16(), 204);
         assert_eq!(Some(0), response.content_length());
+
+        Ok(())
     }
 
     #[tokio::test]

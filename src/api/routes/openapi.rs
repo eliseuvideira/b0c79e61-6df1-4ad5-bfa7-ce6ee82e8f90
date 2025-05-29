@@ -16,7 +16,7 @@ pub fn create_router() -> Router {
 
 async fn index() -> impl IntoResponse {
     Html(
-        Documentation::new("Integrations API", "/openapi")
+        Documentation::new("Integrations API", "/openapi.json")
             .build()
             .unwrap(),
     )

@@ -19,7 +19,7 @@ use crate::{config::Config, telemetry::Metrics};
 
 mod middlewares;
 mod routes;
-mod types;
+pub mod types;
 
 pub struct Api {
     port: u16,
