@@ -159,8 +159,8 @@ pub async fn consume_message(
     let mut transaction = db_pool.begin().await?;
 
     let package = Package {
-        id: json_data.id,
-        registry: json_data.registry,
+        id: Uuid::now_v7(),
+        registry: message.registry,
         name: json_data.name,
         version: json_data.version,
         downloads: json_data.downloads as i64,
@@ -176,8 +176,6 @@ pub async fn consume_message(
 
 #[derive(Debug, Deserialize)]
 pub struct PackageOutput {
-    id: Uuid,
-    registry: String,
     name: String,
     version: String,
     downloads: u64,

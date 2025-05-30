@@ -4,6 +4,7 @@ use uuid::Uuid;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JobMessage {
     pub job_id: Uuid,
+    pub registry: String,
     pub package_name: String,
 }
 

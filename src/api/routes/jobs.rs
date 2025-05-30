@@ -72,6 +72,7 @@ pub async fn create_job(
 
     let message = JobMessage {
         job_id: job.id,
+        registry: job.registry.clone(),
         package_name: job.package_name.clone(),
     };
     let channel = app_state.rabbitmq_connection.create_channel().await?;
