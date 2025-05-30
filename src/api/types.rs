@@ -17,13 +17,15 @@ impl<T> ApiResponseList<T>
 where
     T: Serialize + Cursor,
 {
-    pub fn new(items: Vec<T>, limit: u64) -> Self {
+    pub fn new(items: Vec<T>, limit: Limit) -> Self {
         let mut data = items;
+        let limit: u64 = limit.into();
         let has_more = data.len() > limit as usize;
 
+        data.truncate(limit as usize);
+
         let next_cursor = if has_more {
-            let remaining = data.split_off(limit as usize);
-            remaining.first().map(|item| item.cursor())
+            data.last().map(|item| item.cursor())
         } else {
             None
         };
@@ -49,7 +51,7 @@ where
 #[derive(Debug, Deserialize)]
 pub struct PaginationQuery {
     pub limit: Option<u64>,
-    pub cursor: Option<Uuid>,
+    pub after: Option<Uuid>,
     #[serde(default)]
     pub order: Order,
 }
@@ -77,6 +79,34 @@ impl From<Order> for db::Order {
     }
 }
 
+pub struct Limit(u64);
+
+impl From<Limit> for u64 {
+    fn from(limit: Limit) -> Self {
+        limit.0
+    }
+}
+
+impl Limit {
+    pub fn as_u64(&self) -> u64 {
+        self.0
+    }
+}
+
+impl TryFrom<u64> for Limit {
+    type Error = crate::error::Error;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        if value > 100 {
+            Err(crate::error::Error::InvalidInput(
+                "Limit must be less than 100".to_string(),
+            ))
+        } else {
+            Ok(Limit(value))
+        }
+    }
+}
+
 pub struct AppState {
     pub db_pool: Pool<Postgres>,
     pub rabbitmq_connection: Arc<Connection>,
@@ -90,7 +120,7 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        api::types::{ApiResponse, ApiResponseList, Order},
+        api::types::{ApiResponse, ApiResponseList, Limit, Order},
         db,
         types::Cursor,
     };
@@ -116,7 +146,7 @@ mod tests {
         assert_eq!(items.len(), 100);
 
         // Act
-        let list = ApiResponseList::new(items, 100);
+        let list = ApiResponseList::new(items, Limit(100));
 
         // Assert
         assert_eq!(list.next_cursor, None);
@@ -134,13 +164,13 @@ mod tests {
         assert_eq!(items.len(), 101);
 
         // Act
-        let list = ApiResponseList::new(items, 100);
+        let list = ApiResponseList::new(items, Limit(100));
 
         // Assert
         assert_eq!(list.data.len(), 100);
         assert_eq!(
             list.next_cursor,
-            Some(Uuid::from_u64_pair(100, 0).to_string())
+            Some(Uuid::from_u64_pair(99, 0).to_string())
         );
     }
 

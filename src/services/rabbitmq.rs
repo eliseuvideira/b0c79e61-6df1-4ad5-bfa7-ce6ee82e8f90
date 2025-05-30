@@ -14,7 +14,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::config::RabbitMQConfig;
 
-#[instrument(name = "rabbitmq_connect", skip_all)]
+#[instrument(name = "rabbitmq_connect", skip(settings))]
 pub async fn connect(settings: &RabbitMQConfig) -> Result<Connection> {
     let connection = Connection::connect(
         &settings.url,
@@ -98,7 +98,7 @@ impl<'a> opentelemetry::propagation::Injector for HeaderInjector<'a> {
     }
 }
 
-#[instrument(name = "publish_message", skip_all, fields(exchange = %exchange, routing_key = %routing_key))]
+#[instrument(name = "publish_message", skip(channel, payload))]
 pub async fn publish_message<T: Serialize>(
     channel: &Channel,
     exchange: &str,
@@ -140,7 +140,7 @@ pub async fn publish_message<T: Serialize>(
     Ok(())
 }
 
-#[instrument(name = "create_consumer", skip_all, fields(queue = %queue_name))]
+#[instrument(name = "create_consumer", skip(channel))]
 pub async fn create_consumer(channel: &Channel, queue_name: &str) -> Result<Consumer> {
     let consumer = channel
         .basic_consume(

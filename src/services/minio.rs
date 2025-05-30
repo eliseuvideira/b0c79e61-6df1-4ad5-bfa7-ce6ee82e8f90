@@ -5,7 +5,7 @@ use tracing::instrument;
 
 use crate::config::MinioConfig;
 
-#[instrument(name = "create_client", skip_all)]
+#[instrument(name = "create_client", skip(settings))]
 pub async fn create_client(settings: &MinioConfig) -> Result<Client> {
     let credentials = settings.credentials();
 
@@ -22,7 +22,7 @@ pub async fn create_client(settings: &MinioConfig) -> Result<Client> {
     Ok(Client::from_conf(s3_config))
 }
 
-#[instrument(name = "list_buckets", skip_all)]
+#[instrument(name = "list_buckets", skip(client))]
 pub async fn list_buckets(client: &Client) -> Result<Vec<String>> {
     let response = client.list_buckets().send().await?;
     let buckets = response.buckets().to_owned();
@@ -33,14 +33,14 @@ pub async fn list_buckets(client: &Client) -> Result<Vec<String>> {
     Ok(bucket_names)
 }
 
-#[instrument(name = "create_bucket", skip_all, fields(bucket_name = %bucket_name))]
+#[instrument(name = "create_bucket", skip(client))]
 pub async fn create_bucket(client: &Client, bucket_name: &str) -> Result<()> {
     client.create_bucket().bucket(bucket_name).send().await?;
 
     Ok(())
 }
 
-#[instrument(name = "ensure_bucket", skip_all, fields(bucket_name = %bucket_name))]
+#[instrument(name = "ensure_bucket", skip(client))]
 pub async fn ensure_bucket(client: &Client, bucket_name: &str) -> Result<()> {
     match client.head_bucket().bucket(bucket_name).send().await {
         Ok(_) => Ok(()),

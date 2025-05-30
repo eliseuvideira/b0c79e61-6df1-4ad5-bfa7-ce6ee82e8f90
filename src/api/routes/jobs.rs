@@ -15,7 +15,7 @@ use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
-    api::types::{ApiResponse, ApiResponseList, AppState, PaginationQuery},
+    api::types::{ApiResponse, ApiResponseList, AppState, Limit, PaginationQuery},
     db,
     error::Error,
     models::job::{Job, JobStatus},
@@ -86,12 +86,12 @@ pub async fn get_jobs(
     Query(query): Query<PaginationQuery>,
     State(app_state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, Error> {
-    let limit = query.limit.unwrap_or(100);
-    let cursor = query.cursor;
+    let limit: Limit = query.limit.unwrap_or(100).try_into()?;
+    let after = query.after;
     let order = query.order.into();
 
     let mut conn = app_state.db_pool.acquire().await?;
-    let jobs = db::get_jobs(&mut conn, limit, cursor, order).await?;
+    let jobs = db::get_jobs(&mut conn, limit.as_u64() + 1, after, order).await?;
 
     Ok(Json(ApiResponseList::new(jobs, limit)))
 }

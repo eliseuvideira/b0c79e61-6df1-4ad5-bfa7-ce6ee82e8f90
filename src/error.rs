@@ -8,6 +8,8 @@ use serde::Serialize;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("{0}")]
+    InvalidInput(String),
+    #[error("{0}")]
     NotFound(String),
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -27,6 +29,9 @@ struct ErrorResponse {
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         match self {
+            Error::InvalidInput(message) => {
+                (StatusCode::BAD_REQUEST, Json(ErrorResponse { message })).into_response()
+            }
             Error::NotFound(message) => {
                 (StatusCode::NOT_FOUND, Json(ErrorResponse { message })).into_response()
             }

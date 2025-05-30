@@ -177,7 +177,7 @@ async fn test_get_jobs_returns_paginated_jobs_with_limit_for_asc_order() -> Resu
     for i in 0..10 {
         assert_eq!(body["data"][i]["id"], job_ids[i]);
     }
-    assert_eq!(body["next_cursor"], job_ids[10]);
+    assert_eq!(body["next_cursor"], job_ids[9]);
 
     Ok(())
 }
@@ -207,7 +207,7 @@ async fn test_get_jobs_returns_paginated_jobs_with_limit_for_desc_order() -> Res
     for i in 0..LIMIT {
         assert_eq!(body["data"][i]["id"], job_ids[COUNT - i - 1]);
     }
-    assert_eq!(body["next_cursor"], job_ids[COUNT - LIMIT - 1]);
+    assert_eq!(body["next_cursor"], job_ids[COUNT - LIMIT]);
 
     Ok(())
 }
@@ -226,13 +226,13 @@ async fn test_get_jobs_paginates_properly_with_cursor_for_desc_order() -> Result
     let job_ids: Vec<String> = jobs.iter().map(|job| job.data.id.to_string()).collect();
 
     let pages = COUNT / LIMIT;
-    let mut cursor = None;
+    let mut after = None;
     for page in 0..pages {
         // Act
-        let url = match &cursor {
-            Some(cursor) => format!(
-                "{}/jobs?limit={}&order=desc&cursor={}",
-                app.address, LIMIT, cursor
+        let url = match &after {
+            Some(after) => format!(
+                "{}/jobs?limit={}&order=desc&after={}",
+                app.address, LIMIT, after
             ),
             None => format!("{}/jobs?limit={}&order=desc", app.address, LIMIT),
         };
@@ -244,7 +244,7 @@ async fn test_get_jobs_paginates_properly_with_cursor_for_desc_order() -> Result
         if page < pages - 1 {
             assert_eq!(
                 body["next_cursor"],
-                job_ids[COUNT - (LIMIT * (page + 1)) - 1]
+                job_ids[COUNT - (LIMIT * (page + 1))]
             );
         } else {
             assert!(body["next_cursor"].is_null());
@@ -253,9 +253,9 @@ async fn test_get_jobs_paginates_properly_with_cursor_for_desc_order() -> Result
         let next_cursor = body
             .get("next_cursor")
             .context("next_cursor is not present")?;
-        cursor = next_cursor.as_str().map(|id| id.to_string());
+        after = next_cursor.as_str().map(|id| id.to_string());
     }
-    assert!(cursor.is_none());
+    assert!(after.is_none());
 
     Ok(())
 }

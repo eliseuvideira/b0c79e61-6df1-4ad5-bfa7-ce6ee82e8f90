@@ -47,11 +47,11 @@ pub async fn complete_job(conn: &mut PgConnection, id: Uuid) -> Result<Job> {
 pub async fn get_jobs(
     conn: &mut PgConnection,
     limit: u64,
-    cursor: Option<Uuid>,
+    after: Option<Uuid>,
     order: Order,
 ) -> Result<Vec<Job>> {
-    match cursor {
-        Some(cursor) => get_jobs_with_limit_after(conn, limit, cursor, order).await,
+    match after {
+        Some(after) => get_jobs_with_limit_after(conn, limit, after, order).await,
         None => get_jobs_with_limit(conn, limit, order).await,
     }
 }
@@ -62,67 +62,79 @@ async fn get_jobs_with_limit(
     order: Order,
 ) -> Result<Vec<Job>> {
     match order {
-        Order::Asc => {
-            let jobs = sqlx::query_as!(
-                Job,
-                "SELECT * FROM jobs ORDER BY id ASC LIMIT $1 + 1;",
-                limit as i64
-            )
-            .fetch_all(conn)
-            .instrument(instrument_query(Operation::Select, "jobs"))
-            .await?;
-
-            Ok(jobs)
-        }
-        Order::Desc => {
-            let jobs = sqlx::query_as!(
-                Job,
-                "SELECT * FROM jobs ORDER BY id DESC LIMIT $1 + 1;",
-                limit as i64
-            )
-            .fetch_all(conn)
-            .instrument(instrument_query(Operation::Select, "jobs"))
-            .await?;
-
-            Ok(jobs)
-        }
+        Order::Asc => get_jobs_with_limit_asc(conn, limit).await,
+        Order::Desc => get_jobs_with_limit_desc(conn, limit).await,
     }
+}
+
+async fn get_jobs_with_limit_asc(conn: &mut PgConnection, limit: u64) -> Result<Vec<Job>> {
+    let jobs = sqlx::query_as!(
+        Job,
+        "SELECT * FROM jobs ORDER BY id ASC LIMIT $1;",
+        limit as i64
+    )
+    .fetch_all(conn)
+    .instrument(instrument_query(Operation::Select, "jobs"))
+    .await?;
+    Ok(jobs)
+}
+
+async fn get_jobs_with_limit_desc(conn: &mut PgConnection, limit: u64) -> Result<Vec<Job>> {
+    let jobs = sqlx::query_as!(
+        Job,
+        "SELECT * FROM jobs ORDER BY id DESC LIMIT $1;",
+        limit as i64
+    )
+    .fetch_all(conn)
+    .instrument(instrument_query(Operation::Select, "jobs"))
+    .await?;
+    Ok(jobs)
 }
 
 async fn get_jobs_with_limit_after(
     conn: &mut PgConnection,
     limit: u64,
-    cursor: Uuid,
+    after: Uuid,
     order: Order,
 ) -> Result<Vec<Job>> {
     match order {
-        Order::Asc => {
-            let jobs = sqlx::query_as!(
-                Job,
-                "SELECT * FROM jobs WHERE id >= $1 ORDER BY id ASC LIMIT $2 + 1;",
-                cursor,
-                limit as i64,
-            )
-            .fetch_all(conn)
-            .instrument(instrument_query(Operation::Select, "jobs"))
-            .await?;
-
-            Ok(jobs)
-        }
-        Order::Desc => {
-            let jobs = sqlx::query_as!(
-                Job,
-                "SELECT * FROM jobs WHERE id <= $1 ORDER BY id DESC LIMIT $2 + 1;",
-                cursor,
-                limit as i64,
-            )
-            .fetch_all(conn)
-            .instrument(instrument_query(Operation::Select, "jobs"))
-            .await?;
-
-            Ok(jobs)
-        }
+        Order::Asc => get_jobs_with_limit_after_asc(conn, limit, after).await,
+        Order::Desc => get_jobs_with_limit_after_desc(conn, limit, after).await,
     }
+}
+
+async fn get_jobs_with_limit_after_asc(
+    conn: &mut PgConnection,
+    limit: u64,
+    after: Uuid,
+) -> Result<Vec<Job>> {
+    let jobs = sqlx::query_as!(
+        Job,
+        "SELECT * FROM jobs WHERE id > $1 ORDER BY id ASC LIMIT $2;",
+        after,
+        limit as i64,
+    )
+    .fetch_all(conn)
+    .instrument(instrument_query(Operation::Select, "jobs"))
+    .await?;
+    Ok(jobs)
+}
+
+async fn get_jobs_with_limit_after_desc(
+    conn: &mut PgConnection,
+    limit: u64,
+    after: Uuid,
+) -> Result<Vec<Job>> {
+    let jobs = sqlx::query_as!(
+        Job,
+        "SELECT * FROM jobs WHERE id < $1 ORDER BY id DESC LIMIT $2;",
+        after,
+        limit as i64,
+    )
+    .fetch_all(conn)
+    .instrument(instrument_query(Operation::Select, "jobs"))
+    .await?;
+    Ok(jobs)
 }
 
 #[instrument(name = "get_one", skip(conn))]
