@@ -39,7 +39,7 @@ impl Display for JobStatus {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Job {
     pub id: Uuid,
-    pub registry_name: String,
+    pub registry: String,
     pub package_name: String,
     pub status: JobStatus,
     pub trace_id: Option<String>,

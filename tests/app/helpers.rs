@@ -25,25 +25,25 @@ pub struct TestApp {
 
 impl TestApp {
     pub fn registry_queue(&self) -> Result<(String, String)> {
-        let (registry_name, queue) = self
+        let (registry, queue) = self
             .integration_queues
             .iter()
             .next()
             .ok_or(anyhow::anyhow!("No registry queue"))?;
-        Ok((registry_name.clone(), queue.clone()))
+        Ok((registry.clone(), queue.clone()))
     }
 
     pub async fn mock_create_job(
         &self,
         client: &Client,
-        registry_name: &str,
+        registry: &str,
     ) -> Result<ApiResponse<Job>> {
         let package_name: String = Name().fake();
         let url = format!("{}/jobs", self.address);
         let response = client
             .post(url)
             .json(&json!({
-                "registry_name": registry_name,
+                "registry": registry,
                 "package_name": package_name,
             }))
             .send()
@@ -57,12 +57,12 @@ impl TestApp {
     pub async fn mock_create_jobs(
         &self,
         client: &Client,
-        registry_name: &str,
+        registry: &str,
         count: u64,
     ) -> Result<Vec<ApiResponse<Job>>> {
         let mut jobs = Vec::new();
         for _ in 0..count {
-            let response = self.mock_create_job(client, registry_name).await?;
+            let response = self.mock_create_job(client, registry).await?;
             jobs.push(response);
         }
 

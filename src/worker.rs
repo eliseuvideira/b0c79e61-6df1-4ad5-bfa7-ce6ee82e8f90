@@ -13,6 +13,7 @@ use serde::Deserialize;
 use sqlx::{Pool, Postgres};
 use tracing::{info_span, instrument, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+use uuid::Uuid;
 
 use crate::{
     db,
@@ -159,6 +160,7 @@ pub async fn consume_message(
 
     let package = Package {
         id: json_data.id,
+        registry: json_data.registry,
         name: json_data.name,
         version: json_data.version,
         downloads: json_data.downloads as i64,
@@ -174,7 +176,8 @@ pub async fn consume_message(
 
 #[derive(Debug, Deserialize)]
 pub struct PackageOutput {
-    id: String,
+    id: Uuid,
+    registry: String,
     name: String,
     version: String,
     downloads: u64,

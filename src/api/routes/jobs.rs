@@ -33,7 +33,7 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
 
 #[derive(Debug, Deserialize)]
 pub struct CreateJobPayload {
-    pub registry_name: String,
+    pub registry: String,
     pub package_name: String,
 }
 
@@ -43,7 +43,7 @@ pub async fn create_job(
     Json(payload): Json<CreateJobPayload>,
 ) -> Result<impl IntoResponse, Error> {
     let id = Uuid::now_v7();
-    let registry_name = payload.registry_name;
+    let registry = payload.registry;
     let package_name = payload.package_name;
     let trace_id = find_current_trace_id();
 
@@ -51,7 +51,7 @@ pub async fn create_job(
 
     let routing_key = app_state
         .integration_queues
-        .get(&registry_name)
+        .get(&registry)
         .context("Registry not found")?
         .clone();
 
@@ -59,7 +59,7 @@ pub async fn create_job(
         &mut transaction,
         Job {
             id,
-            registry_name,
+            registry,
             package_name,
             status: JobStatus::Processing,
             trace_id: trace_id.clone(),

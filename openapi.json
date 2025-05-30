@@ -72,7 +72,7 @@
                 "$ref": "#/components/schemas/CreateJobRequest"
               },
               "example": {
-                "registry_name": "crates.io",
+                "registry": "crates.io",
                 "package_name": "tokio"
               }
             }
@@ -153,9 +153,9 @@
     "schemas": {
       "CreateJobRequest": {
         "type": "object",
-        "required": ["registry_name", "package_name"],
+        "required": ["registry", "package_name"],
         "properties": {
-          "registry_name": {
+          "registry": {
             "type": "string",
             "enum": ["crates.io", "jsr.io"],
             "description": "The registry where the package is hosted"
@@ -174,7 +174,7 @@
             "format": "uuid",
             "description": "Unique identifier of the job"
           },
-          "registry_name": {
+          "registry": {
             "type": "string",
             "enum": ["crates.io", "jsr.io"],
             "description": "The registry name"
@@ -200,7 +200,7 @@
         },
         "example": {
           "id": "a79f1b0c-85f3-4e45-b3b2-cff1b162a021",
-          "registry_name": "crates.io",
+          "registry": "crates.io",
           "package_name": "tokio",
           "status": "processing",
           "trace_id": "abc123",

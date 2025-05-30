@@ -1,6 +1,6 @@
 CREATE TABLE jobs (
     id UUID PRIMARY KEY,
-    registry_name TEXT NOT NULL,
+    registry TEXT NOT NULL,
     package_name TEXT NOT NULL,
     status TEXT NOT NULL,
     trace_id TEXT NULL,

@@ -14,9 +14,9 @@ use super::types::Order;
 pub async fn insert_job(conn: &mut PgConnection, job: Job) -> Result<Job> {
     let result = sqlx::query_as!(
         Job,
-        "INSERT INTO jobs (id, registry_name, package_name, status, trace_id, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;",
+        "INSERT INTO jobs (id, registry, package_name, status, trace_id, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;",
         job.id,
-        job.registry_name,
+        job.registry,
         job.package_name,
         job.status.to_string(),
         job.trace_id,

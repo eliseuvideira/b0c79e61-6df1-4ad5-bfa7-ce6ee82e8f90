@@ -73,7 +73,16 @@ jobs:
           GRANT_QUERY="ALTER USER ${APP_USER} CREATEDB;"
           PGPASSWORD="password" psql -U "postgres" -h "127.0.0.1" -c "${GRANT_QUERY}"
       - name: Migrate
-        run: ./scripts/init_db.sh
+        run: |
+          DB_USER="${POSTGRES_USER:=postgres}"
+          DB_PASSWORD="${POSTGRES_PASSWORD:=password}"
+          DB_NAME="${POSTGRES_DB:=integrations}"
+          DB_PORT="${POSTGRES_PORT:=5432}"
+          DB_HOST="${POSTGRES_HOST:=127.0.0.1}"
+          DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
+          export DATABASE_URL
+          sqlx database create
+          sqlx migrate run
       - name: Check that queries are fresh
         run: cargo sqlx prepare --workspace --check -- --all-targets
       - name: Test
@@ -161,7 +170,16 @@ jobs:
           GRANT_QUERY="ALTER USER ${APP_USER} CREATEDB;"
           PGPASSWORD="password" psql -U "postgres" -h "127.0.0.1" -c "${GRANT_QUERY}"
       - name: Migrate
-        run: ./scripts/init_db.sh
+        run: |
+          DB_USER="${POSTGRES_USER:=postgres}"
+          DB_PASSWORD="${POSTGRES_PASSWORD:=password}"
+          DB_NAME="${POSTGRES_DB:=integrations}"
+          DB_PORT="${POSTGRES_PORT:=5432}"
+          DB_HOST="${POSTGRES_HOST:=127.0.0.1}"
+          DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
+          export DATABASE_URL
+          sqlx database create
+          sqlx migrate run
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov
       - uses: taiki-e/install-action@cargo-llvm-cov

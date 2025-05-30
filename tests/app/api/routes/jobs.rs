@@ -11,14 +11,14 @@ async fn test_create_job() -> Result<()> {
     // Arrange
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
-    let (registry_name, _) = app.registry_queue()?;
+    let (registry, _) = app.registry_queue()?;
 
     // Act
     let url = format!("{}/jobs", app.address);
     let response = client
         .post(url)
         .json(&json!({
-            "registry_name": registry_name,
+            "registry": registry,
             "package_name": "serde",
         }))
         .send()
@@ -35,7 +35,7 @@ async fn test_create_job_inserts_into_db() -> Result<()> {
     // Arrange
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
-    let (registry_name, _) = app.registry_queue()?;
+    let (registry, _) = app.registry_queue()?;
     let package_name: String = Name().fake();
 
     // Act
@@ -43,7 +43,7 @@ async fn test_create_job_inserts_into_db() -> Result<()> {
     client
         .post(url)
         .json(&json!({
-            "registry_name": registry_name,
+            "registry": registry,
             "package_name": package_name,
         }))
         .send()
@@ -54,7 +54,7 @@ async fn test_create_job_inserts_into_db() -> Result<()> {
         .fetch_all(&app.db_pool)
         .await?;
     assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].registry_name, registry_name);
+    assert_eq!(rows[0].registry, registry);
     assert_eq!(rows[0].package_name, package_name);
 
     Ok(())
@@ -65,14 +65,14 @@ async fn test_create_job_returns_job_object() -> Result<()> {
     // Arrange
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
-    let (registry_name, _) = app.registry_queue()?;
+    let (registry, _) = app.registry_queue()?;
 
     // Act
     let url = format!("{}/jobs", app.address);
     let response = client
         .post(url)
         .json(&json!({
-            "registry_name": registry_name,
+            "registry": registry,
             "package_name": "serde",
         }))
         .send()
@@ -82,7 +82,7 @@ async fn test_create_job_returns_job_object() -> Result<()> {
     assert_eq!(response.status(), StatusCode::CREATED);
     let body = response.json::<serde_json::Value>().await?;
     assert_eq!(body["data"]["id"].is_string(), true);
-    assert_eq!(body["data"]["registry_name"], *registry_name);
+    assert_eq!(body["data"]["registry"], *registry);
     assert_eq!(body["data"]["package_name"], "serde");
 
     Ok(())
@@ -93,14 +93,14 @@ async fn test_create_job_publishes_to_rabbitmq() -> Result<()> {
     // Arrange
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
-    let (registry_name, queue_name) = app.registry_queue()?;
+    let (registry, queue_name) = app.registry_queue()?;
 
     // Act
     let url = format!("{}/jobs", app.address);
     client
         .post(url)
         .json(&json!({
-            "registry_name": registry_name,
+            "registry": registry,
             "package_name": "serde",
         }))
         .send()
@@ -162,9 +162,9 @@ async fn test_get_jobs_returns_paginated_jobs_with_limit_for_asc_order() -> Resu
     // Arrange
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
-    let (registry_name, _) = app.registry_queue()?;
+    let (registry, _) = app.registry_queue()?;
 
-    let jobs = app.mock_create_jobs(&client, &registry_name, 20).await?;
+    let jobs = app.mock_create_jobs(&client, &registry, 20).await?;
     let job_ids: Vec<String> = jobs.iter().map(|job| job.data.id.to_string()).collect();
 
     // Act
@@ -189,9 +189,9 @@ async fn test_get_jobs_returns_paginated_jobs_with_limit_for_desc_order() -> Res
     const COUNT: usize = 15;
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
-    let (registry_name, _) = app.registry_queue()?;
+    let (registry, _) = app.registry_queue()?;
     let jobs = app
-        .mock_create_jobs(&client, &registry_name, COUNT as u64)
+        .mock_create_jobs(&client, &registry, COUNT as u64)
         .await?;
     let job_ids: Vec<String> = jobs.iter().map(|job| job.data.id.to_string()).collect();
 
@@ -219,9 +219,9 @@ async fn test_get_jobs_paginates_properly_with_cursor_for_desc_order() -> Result
     const COUNT: usize = 50;
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
-    let (registry_name, _) = app.registry_queue()?;
+    let (registry, _) = app.registry_queue()?;
     let jobs = app
-        .mock_create_jobs(&client, &registry_name, COUNT as u64)
+        .mock_create_jobs(&client, &registry, COUNT as u64)
         .await?;
     let job_ids: Vec<String> = jobs.iter().map(|job| job.data.id.to_string()).collect();
 
@@ -262,8 +262,8 @@ async fn test_get_job_by_id_returns_200() -> Result<()> {
     // Arrange
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
-    let (registry_name, _) = app.registry_queue()?;
-    let job = app.mock_create_job(&client, &registry_name).await?;
+    let (registry, _) = app.registry_queue()?;
+    let job = app.mock_create_job(&client, &registry).await?;
 
     // Act
     let response = client
@@ -282,8 +282,8 @@ async fn test_get_job_by_id_returns_200_with_job_object() -> Result<()> {
     // Arrange
     let app = spawn_app().await?;
     let client = reqwest::Client::new();
-    let (registry_name, _) = app.registry_queue()?;
-    let job = app.mock_create_job(&client, &registry_name).await?;
+    let (registry, _) = app.registry_queue()?;
+    let job = app.mock_create_job(&client, &registry).await?;
 
     // Act
     let response = client
