@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM jobs WHERE id >= $1 ORDER BY id ASC LIMIT $2 + 1;",
+  "query": "SELECT * FROM jobs ORDER BY id ASC LIMIT $1;",
   "describe": {
     "columns": [
       {
@@ -36,8 +36,7 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Int4"
+        "Int8"
       ]
     },
     "nullable": [
@@ -49,5 +48,5 @@
       false
     ]
   },
-  "hash": "8b4a1e00217df5e6025eb20e2b30275ea4691265ffebb394450cabe65dfa7cf9"
+  "hash": "904e930d93bb0fbc396510e218c197c48b23a7122553213166a81b812a9dc4be"
 }

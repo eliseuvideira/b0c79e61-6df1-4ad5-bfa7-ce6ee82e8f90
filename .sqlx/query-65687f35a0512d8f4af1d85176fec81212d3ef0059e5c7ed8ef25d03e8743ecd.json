@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM jobs ORDER BY id ASC LIMIT $1 + 1;",
+  "query": "SELECT * FROM jobs ORDER BY id DESC LIMIT $1;",
   "describe": {
     "columns": [
       {
@@ -36,7 +36,7 @@
     ],
     "parameters": {
       "Left": [
-        "Int4"
+        "Int8"
       ]
     },
     "nullable": [
@@ -48,5 +48,5 @@
       false
     ]
   },
-  "hash": "737f56dbf2c75ba7b91634df59e335191dd4b5d8729419fe12ae61bfd79eaefd"
+  "hash": "65687f35a0512d8f4af1d85176fec81212d3ef0059e5c7ed8ef25d03e8743ecd"
 }
