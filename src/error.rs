@@ -52,3 +52,58 @@ impl IntoResponse for Error {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use http::HeaderValue;
+
+    use super::*;
+
+    #[test]
+    fn test_error_response() {
+        // Arrange
+        let error = Error::InvalidInput("Invalid input".to_string());
+
+        // Act
+        let response = error.into_response();
+
+        // Assert
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            response.headers().get("Content-Type"),
+            Some(&HeaderValue::from_static("application/json"))
+        );
+    }
+
+    #[test]
+    fn test_error_response_not_found() {
+        // Arrange
+        let error = Error::NotFound("Not found".to_string());
+
+        // Act
+        let response = error.into_response();
+
+        // Assert
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response.headers().get("Content-Type"),
+            Some(&HeaderValue::from_static("application/json"))
+        );
+    }
+
+    #[test]
+    fn test_error_response_internal_server_error() {
+        // Arrange
+        let error = Error::Unknown(anyhow::anyhow!("Unknown error"));
+
+        // Act
+        let response = error.into_response();
+
+        // Assert
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(
+            response.headers().get("Content-Type"),
+            Some(&HeaderValue::from_static("application/json"))
+        );
+    }
+}
