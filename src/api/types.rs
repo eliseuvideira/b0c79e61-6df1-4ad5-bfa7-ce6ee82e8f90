@@ -19,7 +19,7 @@ where
 {
     pub fn new(items: Vec<T>, limit: Limit) -> Self {
         let mut data = items;
-        let limit: u64 = limit.into();
+        let limit: u64 = limit.as_u64();
         let has_more = data.len() > limit as usize;
 
         data.truncate(limit as usize);
@@ -80,12 +80,6 @@ impl From<Order> for db::Order {
 }
 
 pub struct Limit(u64);
-
-impl From<Limit> for u64 {
-    fn from(limit: Limit) -> Self {
-        limit.0
-    }
-}
 
 impl Limit {
     pub fn as_u64(&self) -> u64 {

@@ -242,10 +242,7 @@ async fn test_get_jobs_paginates_properly_with_cursor_for_desc_order() -> Result
         assert_eq!(response.status(), StatusCode::OK);
         let body: serde_json::Value = response.json().await?;
         if page < pages - 1 {
-            assert_eq!(
-                body["next_cursor"],
-                job_ids[COUNT - (LIMIT * (page + 1))]
-            );
+            assert_eq!(body["next_cursor"], job_ids[COUNT - (LIMIT * (page + 1))]);
         } else {
             assert!(body["next_cursor"].is_null());
         }
