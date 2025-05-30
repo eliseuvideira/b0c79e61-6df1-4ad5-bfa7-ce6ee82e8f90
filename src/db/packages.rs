@@ -45,19 +45,18 @@ pub async fn update_package(conn: &mut PgConnection, package: Package) -> Result
 
 #[instrument(name = "upsert_package", skip(conn))]
 pub async fn upsert_package(conn: &mut PgConnection, package: Package) -> Result<Package> {
-    if sqlx::query_as!(
+    let package = sqlx::query_as!(
         Package,
-        r#"SELECT * FROM packages WHERE registry = $1 AND name = $2 FOR UPDATE;"#,
+        r#"INSERT INTO packages (id, registry, name, version, downloads) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (registry, name) DO UPDATE SET version = $4, downloads = $5 RETURNING *;"#,
+        package.id,
         package.registry,
         package.name,
+        package.version,
+        package.downloads,
     )
-    .fetch_optional(&mut *conn)
-    .instrument(instrument_query(Operation::Select, "packages"))
-    .await?
-    .is_some()
-    {
-        update_package(conn, package).await
-    } else {
-        insert_package(conn, package).await
-    }
+    .fetch_one(&mut *conn)
+    .instrument(instrument_query(Operation::Insert, "packages"))
+    .await?;
+
+    Ok(package)
 }

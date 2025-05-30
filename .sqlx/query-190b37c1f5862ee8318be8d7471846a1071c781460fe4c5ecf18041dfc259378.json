@@ -10,7 +10,7 @@
       },
       {
         "ordinal": 1,
-        "name": "registry_name",
+        "name": "registry",
         "type_info": "Text"
       },
       {

@@ -1,43 +1,50 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE packages SET name = $1, version = $2, downloads = $3 WHERE id = $4 RETURNING *;",
+  "query": "INSERT INTO packages (id, registry, name, version, downloads) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (registry, name) DO UPDATE SET version = $4, downloads = $5 RETURNING *;",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
         "name": "id",
-        "type_info": "Text"
+        "type_info": "Uuid"
       },
       {
         "ordinal": 1,
-        "name": "name",
+        "name": "registry",
         "type_info": "Text"
       },
       {
         "ordinal": 2,
-        "name": "version",
+        "name": "name",
         "type_info": "Text"
       },
       {
         "ordinal": 3,
+        "name": "version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
         "name": "downloads",
         "type_info": "Int8"
       }
     ],
     "parameters": {
       "Left": [
+        "Uuid",
         "Text",
         "Text",
-        "Int8",
-        "Text"
+        "Text",
+        "Int8"
       ]
     },
     "nullable": [
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "9245695af95c1664a0b5337b516467257d86ce0b4c5587e89f9526822a59104d"
+  "hash": "282070abc8eefff6645646f030f654406aea08bc7269d97654dc5a0920baa274"
 }

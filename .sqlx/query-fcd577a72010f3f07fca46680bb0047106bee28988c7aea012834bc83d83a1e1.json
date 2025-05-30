@@ -1,31 +1,37 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO packages (id, name, version, downloads) VALUES ($1, $2, $3, $4) RETURNING *;",
+  "query": "INSERT INTO packages (id, registry, name, version, downloads) VALUES ($1, $2, $3, $4, $5) RETURNING *;",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
         "name": "id",
-        "type_info": "Text"
+        "type_info": "Uuid"
       },
       {
         "ordinal": 1,
-        "name": "name",
+        "name": "registry",
         "type_info": "Text"
       },
       {
         "ordinal": 2,
-        "name": "version",
+        "name": "name",
         "type_info": "Text"
       },
       {
         "ordinal": 3,
+        "name": "version",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
         "name": "downloads",
         "type_info": "Int8"
       }
     ],
     "parameters": {
       "Left": [
+        "Uuid",
         "Text",
         "Text",
         "Text",
@@ -36,8 +42,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "d08f4d6c96ee71ea115fce9a84b335db79b168ab9d9b1c27bff8e436cd189c9f"
+  "hash": "fcd577a72010f3f07fca46680bb0047106bee28988c7aea012834bc83d83a1e1"
 }

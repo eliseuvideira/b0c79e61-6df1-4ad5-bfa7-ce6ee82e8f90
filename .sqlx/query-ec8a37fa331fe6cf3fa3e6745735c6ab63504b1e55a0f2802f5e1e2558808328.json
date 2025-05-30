@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM jobs WHERE id > $1 ORDER BY id ASC LIMIT $2;",
+  "query": "INSERT INTO jobs (id, registry, package_name, status, trace_id, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;",
   "describe": {
     "columns": [
       {
@@ -37,7 +37,11 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Int8"
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz"
       ]
     },
     "nullable": [
@@ -49,5 +53,5 @@
       false
     ]
   },
-  "hash": "2ad4d3268daa703a12a568a2c35e71fedcc504044b4c90cae3c82eb0c8bd319b"
+  "hash": "ec8a37fa331fe6cf3fa3e6745735c6ab63504b1e55a0f2802f5e1e2558808328"
 }
