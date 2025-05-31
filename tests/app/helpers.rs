@@ -6,7 +6,7 @@ use integrations_api::{
     api::types::ApiResponse,
     app::Application,
     config::{Config, DatabaseConfig},
-    models::job::Job,
+    models::{job::Job, package::Package},
     services::rabbitmq,
     telemetry::Metrics,
 };
@@ -67,6 +67,42 @@ impl TestApp {
         }
 
         Ok(jobs)
+    }
+
+    pub async fn mock_create_package(&self, registry: &str) -> Result<Package> {
+        let package_name: String = Name().fake();
+        let package = Package {
+            id: Uuid::now_v7(),
+            registry: registry.to_string(),
+            name: package_name,
+            version: "1.0.0".to_string(),
+            downloads: 0,
+        };
+
+        let mut conn = self.db_pool.acquire().await?;
+        let package = sqlx::query_as!(
+            Package,
+            "INSERT INTO packages (id, registry, name, version, downloads) VALUES ($1, $2, $3, $4, $5) RETURNING *;",
+            package.id,
+            package.registry,
+            package.name,
+            package.version,
+            package.downloads,
+        )
+        .fetch_one(&mut *conn)
+        .await?;
+
+        Ok(package)
+    }
+
+    pub async fn mock_create_packages(&self, registry: &str, count: u64) -> Result<Vec<Package>> {
+        let mut packages = Vec::new();
+        for _ in 0..count {
+            let package = self.mock_create_package(registry).await?;
+            packages.push(package);
+        }
+
+        Ok(packages)
     }
 }
 

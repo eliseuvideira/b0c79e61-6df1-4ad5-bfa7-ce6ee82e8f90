@@ -92,12 +92,18 @@ impl TryFrom<u64> for Limit {
 
     fn try_from(value: u64) -> Result<Self, Self::Error> {
         if value > 100 {
-            Err(crate::error::Error::InvalidInput(
-                "Limit must be less than 100".to_string(),
-            ))
-        } else {
-            Ok(Limit(value))
+            return Err(crate::error::Error::InvalidInput(
+                "Limit must be less than or equal to 100".to_string(),
+            ));
         }
+
+        if value < 1 {
+            return Err(crate::error::Error::InvalidInput(
+                "Limit must be greater than 0".to_string(),
+            ));
+        }
+
+        Ok(Limit(value))
     }
 }
 

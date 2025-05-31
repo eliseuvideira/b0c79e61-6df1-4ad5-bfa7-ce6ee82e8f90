@@ -1,5 +1,6 @@
 pub mod jobs;
 pub mod openapi;
+pub mod packages;
 
 #[cfg(test)]
 mod tests {

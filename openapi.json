@@ -9,6 +9,10 @@
     {
       "name": "Jobs",
       "description": "Operations related to scraping jobs"
+    },
+    {
+      "name": "Packages",
+      "description": "Operations related to scraped packages"
     }
   ],
   "paths": {
@@ -147,6 +151,55 @@
           }
         }
       }
+    },
+    "/packages": {
+      "get": {
+        "summary": "List packages",
+        "description": "Retrieves a list of scraped packages. Supports cursor-based pagination.",
+        "tags": ["Packages"],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of packages to return",
+            "schema": {
+              "type": "integer",
+              "default": 100
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "Order the packages by",
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"]
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Cursor for pagination to fetch packages after a specific package ID",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Packages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackageListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -246,6 +299,55 @@
         "example": {
           "error": {
             "message": "Job not found"
+          }
+        }
+      },
+      "Package": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier of the package"
+          },
+          "registry": {
+            "type": "string",
+            "enum": ["crates.io", "jsr.io"],
+            "description": "The registry name"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the package"
+          },
+          "version": {
+            "type": "string",
+            "description": "Current version of the package"
+          },
+          "downloads": {
+            "type": "integer",
+            "description": "Number of downloads for the package"
+          }
+        },
+        "example": {
+          "id": "019720e5-f26a-74a1-aa93-5415a5055753",
+          "registry": "crates.io",
+          "name": "tokio",
+          "version": "1.36.0",
+          "downloads": 594189966
+        }
+      },
+      "PackageListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Package"
+            }
+          },
+          "next_cursor": {
+            "type": ["string", "null"],
+            "description": "Cursor for fetching the next page of results"
           }
         }
       }

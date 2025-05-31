@@ -3,6 +3,7 @@ use fake::{faker::name::en::Name, Fake};
 use lapin::options::BasicGetOptions;
 use reqwest::StatusCode;
 use serde_json::json;
+use uuid::Uuid;
 
 use crate::helpers::spawn_app;
 
@@ -258,6 +259,78 @@ async fn test_get_jobs_paginates_properly_with_cursor_for_desc_order() -> Result
 }
 
 #[tokio::test]
+async fn test_get_jobs_returns_400_if_limit_is_greater_than_100() -> Result<()> {
+    // Arrange
+    let app = spawn_app().await?;
+    let client = reqwest::Client::new();
+
+    // Act
+    let response = client
+        .get(format!("{}/jobs?limit=101", app.address))
+        .send()
+        .await?;
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_jobs_returns_400_if_limit_is_less_than_1() -> Result<()> {
+    // Arrange
+    let app = spawn_app().await?;
+    let client = reqwest::Client::new();
+
+    // Act
+    let response = client
+        .get(format!("{}/jobs?limit=0", app.address))
+        .send()
+        .await?;
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_jobs_returns_400_if_limit_is_negative() -> Result<()> {
+    // Arrange
+    let app = spawn_app().await?;
+    let client = reqwest::Client::new();
+
+    // Act
+    let response = client
+        .get(format!("{}/jobs?limit=-1", app.address))
+        .send()
+        .await?;
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_jobs_returns_400_if_order_is_invalid() -> Result<()> {
+    // Arrange
+    let app = spawn_app().await?;
+    let client = reqwest::Client::new();
+
+    // Act
+    let response = client
+        .get(format!("{}/jobs?order=invalid", app.address))
+        .send()
+        .await?;
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_get_job_by_id_returns_200() -> Result<()> {
     // Arrange
     let app = spawn_app().await?;
@@ -295,6 +368,28 @@ async fn test_get_job_by_id_returns_200_with_job_object() -> Result<()> {
     assert_eq!(response.status(), StatusCode::OK);
     let body: serde_json::Value = response.json().await?;
     assert_eq!(body["data"]["id"], job.data.id.to_string());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_job_by_id_returns_404_if_job_does_not_exist() -> Result<()> {
+    // Arrange
+    let app = spawn_app().await?;
+    let client = reqwest::Client::new();
+
+    // Act
+    let response = client
+        .get(format!(
+            "{}/jobs/{}",
+            app.address,
+            Uuid::from_u64_pair(0, 0)
+        ))
+        .send()
+        .await?;
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
     Ok(())
 }

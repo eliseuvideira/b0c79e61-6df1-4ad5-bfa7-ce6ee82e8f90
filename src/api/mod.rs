@@ -55,6 +55,7 @@ impl Api {
 
         let router = Router::new()
             .merge(routes::jobs::create_router(app_state.clone()))
+            .merge(routes::packages::create_router(app_state.clone()))
             .merge(routes::openapi::create_router())
             .layer(TraceLayer::new_for_http())
             .layer(from_fn(middlewares::tracing::attach_trace_id))
