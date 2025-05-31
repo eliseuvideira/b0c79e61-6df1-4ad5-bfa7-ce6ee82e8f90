@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use http::StatusCode;
+use serde_json::json;
 
 use crate::helpers::spawn_app;
 
@@ -65,6 +66,89 @@ async fn test_get_packages_returns_paginated_packages() -> Result<()> {
         after = next_cursor.as_str().map(|id| id.to_string());
     }
     assert!(after.is_none());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_package_by_id_returns_200() -> Result<()> {
+    // Arrange
+    let app = spawn_app().await?;
+    let client = reqwest::Client::new();
+    let (registry, _) = app.registry_queue()?;
+    let package = app.mock_create_package(&registry).await?;
+
+    // Act
+    let url = format!("{}/packages/{}", app.address, package.id);
+    let response = client.get(url).send().await?;
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::OK);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_package_by_id_returns_200_with_package_object() -> Result<()> {
+    // Arrange
+    let app = spawn_app().await?;
+    let client = reqwest::Client::new();
+    let (registry, _) = app.registry_queue()?;
+    let package = app.mock_create_package(&registry).await?;
+
+    // Act
+    let url = format!("{}/packages/{}", app.address, package.id);
+    let response = client.get(url).send().await?;
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.json::<serde_json::Value>().await?;
+    assert_eq!(body["data"]["id"], package.id.to_string());
+    assert_eq!(body["data"]["registry"], package.registry);
+    assert_eq!(body["data"]["name"], package.name);
+    assert_eq!(body["data"]["version"], package.version);
+    assert_eq!(body["data"]["downloads"], package.downloads);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_package_by_id_returns_404_if_package_does_not_exist() -> Result<()> {
+    // Arrange
+    let app = spawn_app().await?;
+    let client = reqwest::Client::new();
+    let non_existent_id = "00000000-0000-0000-0000-000000000000";
+
+    // Act
+    let url = format!("{}/packages/{}", app.address, non_existent_id);
+    let response = client.get(url).send().await?;
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    let body = response.json::<serde_json::Value>().await?;
+    assert_eq!(
+        body["message"],
+        format!("Package with id {} not found", non_existent_id)
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_package_by_id_returns_400_if_id_is_invalid() -> Result<()> {
+    // Arrange
+    let app = spawn_app().await?;
+    let client = reqwest::Client::new();
+    let invalid_id = "invalid-uuid";
+
+    // Act
+    let url = format!("{}/packages/{}", app.address, invalid_id);
+    let response = client.get(url).send().await?;
+
+    // Assert
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = response.json::<serde_json::Value>().await?;
+    assert_eq!(body["message"], "Invalid package ID");
 
     Ok(())
 }

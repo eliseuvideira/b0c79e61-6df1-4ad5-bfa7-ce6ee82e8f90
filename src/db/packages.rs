@@ -161,3 +161,17 @@ async fn get_packages_with_limit_after_desc(
 
     Ok(packages)
 }
+
+#[instrument(name = "get_package_by_id", skip(conn))]
+pub async fn get_package_by_id(conn: &mut PgConnection, id: Uuid) -> Result<Option<Package>> {
+    let package = sqlx::query_as!(
+        Package,
+        "SELECT * FROM packages WHERE id = $1;",
+        id
+    )
+    .fetch_optional(&mut *conn)
+    .instrument(instrument_query(Operation::Select, "packages"))
+    .await?;
+
+    Ok(package)
+}
