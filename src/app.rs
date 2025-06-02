@@ -29,7 +29,9 @@ impl Application {
             .queues
             .iter()
             .map(|s| s.as_str())
-            .chain(std::iter::once(configuration.rabbitmq.queue_consumer.as_str()))
+            .chain(std::iter::once(
+                configuration.rabbitmq.queue_consumer.as_str(),
+            ))
             .collect();
 
         rabbitmq::declare_exchange(&channel, &configuration.rabbitmq.exchange_name).await?;
