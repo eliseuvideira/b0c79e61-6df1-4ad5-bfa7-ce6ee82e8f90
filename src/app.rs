@@ -24,18 +24,18 @@ impl Application {
         let rabbitmq_connection = Arc::new(rabbitmq::connect(&configuration.rabbitmq).await?);
         let channel = rabbitmq_connection.create_channel().await?;
 
+        let all_queues: Vec<&str> = configuration
+            .rabbitmq
+            .queues
+            .iter()
+            .map(|s| s.as_str())
+            .chain(std::iter::once(configuration.rabbitmq.queue_consumer.as_str()))
+            .collect();
+
         rabbitmq::declare_exchange(&channel, &configuration.rabbitmq.exchange_name).await?;
-        for queue in configuration.rabbitmq.queues.iter() {
-            rabbitmq::declare_and_bind_queue(
-                &channel,
-                queue,
-                &configuration.rabbitmq.exchange_name,
-            )
-            .await?;
-        }
-        rabbitmq::declare_and_bind_queue(
+        rabbitmq::declare_and_bind_queues(
             &channel,
-            &configuration.rabbitmq.queue_consumer,
+            &all_queues,
             &configuration.rabbitmq.exchange_name,
         )
         .await?;

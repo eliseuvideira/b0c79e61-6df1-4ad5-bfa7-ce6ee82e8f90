@@ -87,6 +87,22 @@ pub async fn declare_and_bind_queue(
     Ok(())
 }
 
+#[instrument(name = "declare_and_bind_queues", skip(channel))]
+pub async fn declare_and_bind_queues(
+    channel: &Channel,
+    queues: &[&str],
+    exchange_name: &str,
+) -> Result<()> {
+    futures::future::try_join_all(
+        queues
+            .iter()
+            .map(|queue| declare_and_bind_queue(channel, queue, exchange_name)),
+    )
+    .await?;
+
+    Ok(())
+}
+
 struct HeaderInjector<'a> {
     headers: &'a mut FieldTable,
 }
